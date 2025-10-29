@@ -112,8 +112,11 @@ const RosterScreen = ({ team, onPlayerSelect, onBack }: { team: Team, onPlayerSe
 
     return (
         <ScreenWrapper screenKey="ROSTER">
-            <h2 className="text-2xl font-press-start text-cyan-400 p-4">Roster</h2>
-            <div className="overflow-x-auto">
+            <div className="flex justify-between items-center p-4">
+                <h2 className="text-2xl font-press-start text-cyan-400">Roster</h2>
+                <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
+            </div>
+            <div className="overflow-x-auto px-4">
                 <table className="w-full text-left">
                     <thead>
                         <tr className="bg-gray-800">
@@ -141,7 +144,6 @@ const RosterScreen = ({ team, onPlayerSelect, onBack }: { team: Team, onPlayerSe
                     </tbody>
                 </table>
             </div>
-            <Button onClick={onBack} className="mt-4">Back</Button>
         </ScreenWrapper>
     );
 };
@@ -181,8 +183,11 @@ const PlayerEditModal = ({ player, onClose }: { player: Player, onClose: () => v
 
 const ScheduleScreen = ({ schedule, teams, myTeamId, week, onGameClick, onBack }: { schedule: Game[], teams: Team[], myTeamId: number, week: number, onGameClick: (game: Game, opponent: Team) => void, onBack: () => void }) => (
     <ScreenWrapper screenKey="SCHEDULE">
-        <h2 className="text-2xl font-press-start text-cyan-400 p-4">Schedule</h2>
-        <div className="space-y-2 p-4">
+        <div className="flex justify-between items-center p-4">
+            <h2 className="text-2xl font-press-start text-cyan-400">Schedule</h2>
+            <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
+        </div>
+        <div className="space-y-2 p-4 pt-0">
             {schedule.map(game => {
                 const opponent = teams.find(t => t.id === game.opponentId)!;
                 const isPast = game.week < week || (game.week === week && game.result);
@@ -211,9 +216,6 @@ const ScheduleScreen = ({ schedule, teams, myTeamId, week, onGameClick, onBack }
                     </div>
                 );
             })}
-        </div>
-        <div className="p-4">
-            <Button onClick={onBack}>Back</Button>
         </div>
     </ScreenWrapper>
 );
@@ -310,8 +312,11 @@ const GameSummaryModal = ({ game, myTeam, opponent, onClose }: { game: Game, myT
 
 const StandingsScreen = ({ teams, rankings, myTeamId, onBack }: { teams: Team[], rankings: { teamId: number, rank: number }[], myTeamId: number, onBack: () => void }) => (
     <ScreenWrapper screenKey="STANDINGS">
-        <h2 className="text-2xl font-press-start text-cyan-400 p-4">National Rankings</h2>
-        <div className="p-4">
+        <div className="flex justify-between items-center p-4">
+            <h2 className="text-2xl font-press-start text-cyan-400">National Rankings</h2>
+            <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
+        </div>
+        <div className="p-4 pt-0">
             {rankings.map(({ teamId, rank }) => {
                 const team = teams.find(t => t.id === teamId)!;
                 return (
@@ -322,9 +327,6 @@ const StandingsScreen = ({ teams, rankings, myTeamId, onBack }: { teams: Team[],
                 );
             })}
         </div>
-        <div className="p-4">
-            <Button onClick={onBack}>Back</Button>
-        </div>
     </ScreenWrapper>
 );
 
@@ -332,8 +334,11 @@ const NationalStatsScreen = ({ teams, onBack }: { teams: Team[], onBack: () => v
     const leaders = React.useMemo(() => GameService.getNationalLeaders(teams), [teams]);
     return (
         <ScreenWrapper screenKey="NATIONAL_STATS">
-            <h2 className="text-2xl font-press-start text-cyan-400 p-4">National Leaders</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+            <div className="flex justify-between items-center p-4">
+                <h2 className="text-2xl font-press-start text-cyan-400">National Leaders</h2>
+                <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 pt-0">
                 {Object.entries(leaders).map(([stat, players]) => (
                     <div key={stat} className="bg-gray-800 p-4">
                         <h3 className="font-press-start text-lg text-yellow-400 mb-2">{stat}</h3>
@@ -347,17 +352,17 @@ const NationalStatsScreen = ({ teams, onBack }: { teams: Team[], onBack: () => v
                     </div>
                 ))}
             </div>
-            <div className="p-4">
-                <Button onClick={onBack}>Back</Button>
-            </div>
         </ScreenWrapper>
     );
 };
 
 const FacilitiesScreen = ({ facilities, funds, onUpgrade, onBack }: { facilities: GameState['facilities'], funds: number, onUpgrade: (facility: keyof GameState['facilities']) => void, onBack: () => void }) => (
     <ScreenWrapper screenKey="FACILITIES">
-        <h2 className="text-2xl font-press-start text-cyan-400 p-4">Facilities</h2>
-        <div className="space-y-4 p-4">
+        <div className="flex justify-between items-center p-4">
+            <h2 className="text-2xl font-press-start text-cyan-400">Facilities</h2>
+            <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
+        </div>
+        <div className="space-y-4 p-4 pt-0">
             {Object.entries(facilities).map(([key, facility]) => (
                 <div key={key} className="bg-gray-800 p-4">
                     <h3 className="font-press-start text-lg capitalize text-yellow-400">{key}</h3>
@@ -369,9 +374,6 @@ const FacilitiesScreen = ({ facilities, funds, onUpgrade, onBack }: { facilities
                 </div>
             ))}
         </div>
-        <div className="p-4">
-            <Button onClick={onBack}>Back</Button>
-        </div>
     </ScreenWrapper>
 );
 
@@ -381,8 +383,11 @@ const TacticsScreen = ({ strategy, onStrategyChange, onBack }: { strategy: GameS
 
     return (
         <ScreenWrapper screenKey="TACTICS">
-             <h2 className="text-2xl font-press-start text-cyan-400 p-4">Tactics</h2>
-             <div className="p-4 space-y-8">
+             <div className="flex justify-between items-center p-4">
+                <h2 className="text-2xl font-press-start text-cyan-400">Tactics</h2>
+                <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
+            </div>
+             <div className="p-4 pt-0 space-y-8">
                  <div>
                      <h3 className="text-xl font-press-start text-yellow-400 mb-4">Offensive Playbook</h3>
                      <div className="grid grid-cols-2 gap-4">
@@ -404,9 +409,6 @@ const TacticsScreen = ({ strategy, onStrategyChange, onBack }: { strategy: GameS
                      </div>
                  </div>
              </div>
-             <div className="p-4">
-                <Button onClick={onBack}>Back</Button>
-            </div>
         </ScreenWrapper>
     );
 };
@@ -414,8 +416,11 @@ const TacticsScreen = ({ strategy, onStrategyChange, onBack }: { strategy: GameS
 const StaffScreen = ({ gameState, onHire, onBack }: { gameState: GameState, onHire: (staffId: string) => void, onBack: () => void }) => {
     return (
         <ScreenWrapper screenKey="STAFF">
-            <h2 className="text-2xl font-press-start text-cyan-400 p-4">Staff</h2>
-            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="flex justify-between items-center p-4">
+                <h2 className="text-2xl font-press-start text-cyan-400">Staff</h2>
+                <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
+            </div>
+            <div className="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                     <h3 className="text-xl font-press-start text-yellow-400 mb-4">Your Staff</h3>
                     <div className="space-y-4">
@@ -451,9 +456,6 @@ const StaffScreen = ({ gameState, onHire, onBack }: { gameState: GameState, onHi
                      </div>
                 </div>
             </div>
-            <div className="p-4">
-                <Button onClick={onBack}>Back</Button>
-            </div>
         </ScreenWrapper>
     );
 };
@@ -461,8 +463,11 @@ const StaffScreen = ({ gameState, onHire, onBack }: { gameState: GameState, onHi
 const SponsorsScreen = ({ gameState, onSelect, onBack }: { gameState: GameState, onSelect: (sponsorId: string) => void, onBack: () => void }) => {
     return (
         <ScreenWrapper screenKey="SPONSORS">
-            <h2 className="text-2xl font-press-start text-cyan-400 p-4">Sponsors</h2>
-            <div className="p-4 space-y-8">
+            <div className="flex justify-between items-center p-4">
+                <h2 className="text-2xl font-press-start text-cyan-400">Sponsors</h2>
+                <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
+            </div>
+            <div className="p-4 pt-0 space-y-8">
                 <div>
                     <h3 className="text-xl font-press-start text-yellow-400 mb-4">Active Sponsor</h3>
                     {gameState.activeSponsor ? (
@@ -490,9 +495,6 @@ const SponsorsScreen = ({ gameState, onSelect, onBack }: { gameState: GameState,
                      </div>
                 </div>
             </div>
-            <div className="p-4">
-                <Button onClick={onBack}>Back</Button>
-            </div>
         </ScreenWrapper>
     );
 };
@@ -502,8 +504,11 @@ const AwardRacesScreen = ({ gameState, onBack }: { gameState: GameState, onBack:
     
     return (
         <ScreenWrapper screenKey="AWARD_RACES">
-             <h2 className="text-2xl font-press-start text-cyan-400 p-4">Mid-Season Award Races</h2>
-             <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+             <div className="flex justify-between items-center p-4">
+                <h2 className="text-2xl font-press-start text-cyan-400">Mid-Season Award Races</h2>
+                <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
+            </div>
+             <div className="p-4 pt-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {Object.entries(awardRaces).map(([award, candidates]) => {
                     {/* FIX: Cast 'candidates' to a specific type to resolve errors with 'length' and 'map' on type 'unknown'. */}
                     const typedCandidates = candidates as {player: Player, teamName: string}[];
@@ -521,9 +526,6 @@ const AwardRacesScreen = ({ gameState, onBack }: { gameState: GameState, onBack:
                     );
                 })}
              </div>
-             <div className="p-4">
-                <Button onClick={onBack}>Back</Button>
-            </div>
         </ScreenWrapper>
     );
 };
@@ -538,8 +540,11 @@ const InboxScreen = ({ gameState, onRead, onDelete, onBack }: { gameState: GameS
 
     return (
         <ScreenWrapper screenKey="INBOX">
-            <h2 className="text-2xl font-press-start text-cyan-400 p-4">Inbox</h2>
-            <div className="p-4 space-y-2">
+            <div className="flex justify-between items-center p-4">
+                <h2 className="text-2xl font-press-start text-cyan-400">Inbox</h2>
+                <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
+            </div>
+            <div className="p-4 pt-0 space-y-2">
                 {gameState.inbox.length === 0 && <p>Your inbox is empty.</p>}
                 {gameState.inbox.slice().reverse().map(msg => (
                     <div key={msg.id} className={`p-3 border border-gray-700 cursor-pointer ${msg.read ? 'bg-gray-800/60' : 'bg-cyan-900/50'}`} onClick={() => handleSelectMessage(msg)}>
@@ -550,9 +555,6 @@ const InboxScreen = ({ gameState, onRead, onDelete, onBack }: { gameState: GameS
                         <p className="truncate text-sm text-gray-300">{msg.body}</p>
                     </div>
                 ))}
-            </div>
-            <div className="p-4">
-                <Button onClick={onBack}>Back</Button>
             </div>
             
             {selectedMessage && (
@@ -573,22 +575,25 @@ const InboxScreen = ({ gameState, onRead, onDelete, onBack }: { gameState: GameS
 
 const GodModeScreen = ({ onToggleForceWin, forceWin, onBack }: { onToggleForceWin: () => void, forceWin: boolean, onBack: () => void }) => (
     <ScreenWrapper screenKey="GOD_MODE">
-        <h2 className="text-2xl font-press-start text-cyan-400 p-4">God Mode</h2>
-        <div className="p-4">
+        <div className="flex justify-between items-center p-4">
+            <h2 className="text-2xl font-press-start text-cyan-400">God Mode</h2>
+            <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
+        </div>
+        <div className="p-4 pt-0">
             <Button onClick={onToggleForceWin}>
                 Force Win Next Game: {forceWin ? 'ON' : 'OFF'}
             </Button>
-        </div>
-        <div className="p-4">
-            <Button onClick={onBack}>Back</Button>
         </div>
     </ScreenWrapper>
 );
 
 const TrophyCaseScreen = ({ trophies, onBack }: { trophies: Trophy[], onBack: () => void }) => (
     <ScreenWrapper screenKey="TROPHY_CASE">
-        <h2 className="text-2xl font-press-start text-cyan-400 p-4">Trophy Case</h2>
-        <div className="p-4 space-y-2">
+        <div className="flex justify-between items-center p-4">
+            <h2 className="text-2xl font-press-start text-cyan-400">Trophy Case</h2>
+            <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
+        </div>
+        <div className="p-4 pt-0 space-y-2">
             {trophies.length === 0 && <p>Your trophy case is empty. Go win something!</p>}
             {trophies.map((trophy, i) => (
                 <div key={i} className="bg-gray-800 p-3">
@@ -596,9 +601,6 @@ const TrophyCaseScreen = ({ trophies, onBack }: { trophies: Trophy[], onBack: ()
                     {trophy.playerName && <p>{trophy.playerName}</p>}
                 </div>
             ))}
-        </div>
-         <div className="p-4">
-            <Button onClick={onBack}>Back</Button>
         </div>
     </ScreenWrapper>
 );
@@ -1082,6 +1084,12 @@ const App = () => {
                 const unreadMessages = gameState.inbox.filter(m => !m.read).length;
                 return (
                     <ScreenWrapper screenKey="MAIN_MENU">
+                        <div className="p-4 text-center bg-black/30 border-b-2 border-cyan-700 mb-4">
+                            <h3 className="text-2xl font-press-start text-yellow-400">
+                                Record: {myTeam.record.wins}-{myTeam.record.losses}
+                            </h3>
+                             <p className="text-sm text-gray-400 mt-1">Overall: {myTeam.ovr}</p>
+                        </div>
                         <MainMenu onNavigate={setScreen} unreadMessages={unreadMessages} />
                         {gameState.lastGameResult && <GameResultModal result={gameState.lastGameResult} myTeamName={myTeam.name} opponentName={gameState.teams.find(t => t.id === gameState.lastGameResult?.opponentId)?.name || ''} onContinue={() => setGameState({...gameState, lastGameResult: null})} />}
                         <div className="p-4">
