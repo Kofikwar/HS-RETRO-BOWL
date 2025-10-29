@@ -1,20 +1,19 @@
 
-
 import * as React from 'react';
-import { GameState, Screen, Team, Player, Game, Position, GameStrategy, Recruit, PlayerStats, OffensivePlaybook, DefensivePlaybook, SeasonAwards, Trophy, ActiveGameState, OffensivePlay, TrainingProgram } from './types';
+import { GameState, Screen, Team, Player, Game, Position, GameStrategy, Recruit, PlayerStats, OffensivePlaybook, DefensivePlaybook, SeasonAwards, Trophy, ActiveGameState, OffensivePlay, TrainingProgram, Staff, Sponsor, InboxMessage } from './types';
 import { POWERHOUSE_TEAMS, MAX_SEASONS } from './constants';
 import * as GameService from './services/gameService';
-import { FootballIcon, RosterIcon, ScheduleIcon, StandingsIcon, FacilitiesIcon, AwardIcon, RecruitIcon, GodModeIcon, ChartIcon, InboxIcon, CoachIcon, SponsorIcon, TrophyIcon, TacticsIcon } from './components/Icons';
+import { FootballIcon, RosterIcon, ScheduleIcon, StandingsIcon, FacilitiesIcon, AwardIcon, RecruitIcon, GodModeIcon, ChartIcon, InboxIcon, CoachIcon, SponsorIcon, TrophyIcon, TacticsIcon, ScoutIcon, DollarIcon } from './components/Icons';
 
 // --- HELPER & UI COMPONENTS ---
 
-const ScreenWrapper = ({ children, screenKey }: { children: React.ReactNode, screenKey: Screen }) => (
+// FIX: Changed to React.FC to make children prop optional and align with Button component, resolving multiple errors.
+const ScreenWrapper: React.FC<{ screenKey: Screen }> = ({ children, screenKey }) => (
     <div key={screenKey} className="fade-in">
         {children}
     </div>
 );
 
-// FIX: Use React.FC to correctly type the component and handle special React props like `key`.
 const Button: React.FC<{ onClick?: React.MouseEventHandler<HTMLButtonElement>; children?: React.ReactNode; className?: string; disabled?: boolean }> = ({ onClick, children, className = '', disabled }) => (
   <button 
     onClick={onClick} 
@@ -35,748 +34,653 @@ const Modal = ({ children, onClose, size = '4xl' }: { children?: React.ReactNode
 
 const Loading = ({ text }: { text: string }) => (
     <div className="fixed inset-0 bg-black/90 flex flex-col items-center justify-center p-4 z-[100]">
-        <div className="w-16 h-16 border-4 border-dashed rounded-full animate-spin border-cyan-400"></div>
-        <p className="text-cyan-400 font-press-start mt-4 text-center">{text}</p>
+        <div className="w-16 h-16 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-xl font-press-start text-cyan-400">{text}</p>
     </div>
 );
 
-const Header = ({ title, onBack }: { title: string; onBack?: () => void; }) => (
-  <div className="text-center p-4 border-b-4 border-cyan-400 bg-gray-800/50 relative">
-    {onBack && <button onClick={onBack} className="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-400 hover:text-white font-press-start text-sm">&lt; BACK</button>}
-    <h1 className="text-2xl md:text-4xl text-cyan-400 font-press-start">{title}</h1>
-  </div>
+const Header = ({ teamName, funds, season, week }: { teamName: string, funds: number, season: number, week: number }) => (
+    <header className="p-4 bg-black/30 border-b-2 border-cyan-400 flex flex-wrap justify-between items-center text-xs md:text-base">
+        <h1 className="font-press-start text-base md:text-2xl text-cyan-400 basis-full md:basis-auto mb-2 md:mb-0">{teamName}</h1>
+        <div className="flex space-x-4">
+            <span>S{season} W{week}</span>
+            <span className="text-green-400">${funds.toLocaleString()}</span>
+        </div>
+    </header>
 );
 
-const StatBar = ({ value, max = 100, colorClass }: { value: number, max?: number, colorClass?: string }) => {
-  const percentage = Math.max(0, Math.min(100, (value / max) * 100));
-  let color = colorClass;
-  if (!color) {
-    if (percentage > 70) color = 'bg-green-500';
-    else if (percentage > 40) color = 'bg-yellow-500';
-    else color = 'bg-red-500'
-  }
-  
-  return (
-    <div className="w-24 h-4 bg-gray-700 border border-gray-500">
-      <div className={`${color} h-full`} style={{ width: `${percentage}%` }}></div>
-    </div>
-  );
+const getAttributeColor = (value: number) => {
+    if (value >= 90) return 'text-cyan-400';
+    if (value >= 80) return 'text-green-400';
+    if (value >= 70) return 'text-yellow-400';
+    return 'text-gray-400';
 };
 
+const getPositionColor = (pos: Position) => {
+    const colors: Record<Position, string> = {
+        'QB': 'bg-red-600', 'RB': 'bg-blue-600', 'WR': 'bg-yellow-500', 'TE': 'bg-orange-500',
+        'OL': 'bg-gray-500', 'DL': 'bg-purple-600', 'LB': 'bg-indigo-600', 'DB': 'bg-green-600', 'K/P': 'bg-pink-500'
+    };
+    return colors[pos];
+};
 
-// --- SCREEN COMPONENTS ---
+// --- SCREENS & MODALS ---
 
-const TeamSelectionScreen = ({ onTeamSelect }: { onTeamSelect: (teamId: number) => void }) => (
-  <div className="p-4 md:p-8">
-    <Header title="Choose Your Team" />
-    <div className="mt-6 text-center">
-      <p className="mb-8 text-lg text-gray-300">Select a powerhouse to begin your coaching career.</p>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl mx-auto">
-        {POWERHOUSE_TEAMS.map(team => (
-          <button key={team.id} onClick={() => onTeamSelect(team.id)} className="p-4 bg-gray-800 hover:bg-cyan-600 border border-gray-600 text-left transition-colors">
-            <h3 className="font-bold text-lg text-white">{team.name}</h3>
-          </button>
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
-const MainMenu = ({ gameState, setScreen, onPlayNextGame, onStartRecruitment, onGodModeClick }: { gameState: GameState, setScreen: (screen: Screen) => void; onPlayNextGame: () => void; onStartRecruitment: () => void; onGodModeClick: () => void; }) => {
-  const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
-  const isPlayoffs = gameState.week > 10;
-  let nextOpponent: Team | null = null;
-  let nextGame: Game | null = null;
-
-  const opponentId = GameService.findNextOpponentId(gameState);
-  if (opponentId) {
-    nextOpponent = gameState.teams.find(t => t.id === opponentId) || null;
-    nextGame = gameState.schedule[myTeam.id]?.find(g => g.week === gameState.week) || { week: gameState.week, opponentId: opponentId, isHome: true, playoffRound: gameState.week === 11 ? 'Quarterfinals' : gameState.week === 12 ? 'Semifinals' : 'Championship' };
-  }
-
-  const isGameOver = gameState.season > MAX_SEASONS;
-
-  return (
-    <div className="p-4 md:p-8">
-      <div className="text-center mb-8">
-        <h1 className="text-2xl md:text-3xl text-cyan-400 font-press-start">{myTeam.name}</h1>
-        <p className="text-lg mt-2">Season {gameState.season} | {isPlayoffs ? nextGame?.playoffRound || 'Playoffs' : `Week ${gameState.week}`}</p>
-        <p className="text-xl font-bold">{myTeam.record.wins} - {myTeam.record.losses}</p>
-        <div className="text-md text-gray-400 mt-2 space-x-4">
-          <span>Funds: ${gameState.funds.toLocaleString()}</span>
-          <span>Fans: <span className={gameState.fanHappiness > 70 ? 'text-green-400' : gameState.fanHappiness > 40 ? 'text-yellow-400' : 'text-red-400'}>{gameState.fanHappiness}%</span></span>
-        </div>
-      </div>
-      
-      <div className="max-w-xl mx-auto space-y-4">
-        <div className="p-4 border-2 border-dashed border-gray-600 text-center">
-          <h2 className="uppercase text-gray-400 text-sm mb-2">Next Game</h2>
-          {nextOpponent ? (
-            <p className="text-xl font-bold">{nextGame?.isHome ? 'vs.' : '@'} {nextOpponent.name} ({nextOpponent.record.wins}-{nextOpponent.record.losses}) {nextGame?.isRivalryGame && <span className="text-red-500 font-press-start text-sm animate-pulse">RIVALRY</span>}</p>
-          ) : gameState.isOffseason ? (
-            <p className="text-xl font-bold text-yellow-400">OFFSEASON</p>
-          ) : isGameOver ? (
-             <p className="text-xl font-bold text-red-500">CAREER OVER</p>
-          ) : isPlayoffs ? (
-            <p className="text-xl font-bold text-green-400">CHAMPION!</p>
-          ) : (
-            <p className="text-xl font-bold">End of Regular Season</p>
-          )}
-        </div>
-
-        {gameState.lastGameResult && (
-             <div className="p-4 border-2 border-dashed border-gray-600 text-center">
-                <h2 className="uppercase text-gray-400 text-sm mb-2">Last Game Result</h2>
-                <p className={`text-xl font-bold ${gameState.lastGameResult.myScore > gameState.lastGameResult.opponentScore ? 'text-green-400' : 'text-red-400'}`}>
-                    {gameState.lastGameResult.myScore > gameState.lastGameResult.opponentScore ? 'W' : 'L'} {gameState.lastGameResult.summary}
-                </p>
+const TeamSelectionScreen = ({ onSelectTeam }: { onSelectTeam: (teamId: number) => void }) => (
+    <ScreenWrapper screenKey="TEAM_SELECTION">
+        <div className="p-4 md:p-8">
+            <h1 className="text-3xl md:text-5xl font-press-start text-center mb-8 text-cyan-400">Select a Powerhouse</h1>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {POWERHOUSE_TEAMS.map(team => (
+                    <Button key={team.id} onClick={() => onSelectTeam(team.id)}>
+                        {team.name}
+                    </Button>
+                ))}
             </div>
-        )}
-        
-        {nextOpponent && !gameState.isOffseason && <Button onClick={onPlayNextGame}><span className="flex items-center"><FootballIcon className="w-5 h-5 mr-3" /> Play Next Game</span></Button>}
-        {gameState.isOffseason && !isGameOver && <Button onClick={onStartRecruitment} className="text-green-400 border-green-400 hover:bg-green-400"><span className="flex items-center"><RecruitIcon className="w-5 h-5 mr-3" /> Go To Recruitment</span></Button>}
-        <div className="grid grid-cols-2 gap-4">
-            <Button onClick={() => setScreen('ROSTER')}><span className="flex items-center"><RosterIcon className="w-5 h-5 mr-3" /> Roster</span></Button>
-            <Button onClick={() => setScreen('TACTICS')}><span className="flex items-center"><TacticsIcon className="w-5 h-5 mr-3" /> Tactics</span></Button>
-            <Button onClick={() => setScreen('SCHEDULE')}><span className="flex items-center"><ScheduleIcon className="w-5 h-5 mr-3" /> Schedule</span></Button>
-            <Button onClick={() => setScreen('STANDINGS')}><span className="flex items-center"><StandingsIcon className="w-5 h-5 mr-3" /> Standings</span></Button>
-            <Button onClick={() => setScreen('NATIONAL_STATS')}><span className="flex items-center"><ChartIcon className="w-5 h-5 mr-3" /> National Stats</span></Button>
-            <Button onClick={() => setScreen('TROPHY_CASE')}><span className="flex items-center"><TrophyIcon className="w-5 h-5 mr-3" /> Trophy Case</span></Button>
-            <Button onClick={() => setScreen('AWARDS')}><span className="flex items-center"><AwardIcon className="w-5 h-5 mr-3" /> Awards</span></Button>
-            <Button onClick={() => setScreen('FACILITIES')}><span className="flex items-center"><FacilitiesIcon className="w-5 h-5 mr-3" /> Facilities</span></Button>
         </div>
-        <Button onClick={onGodModeClick} className="text-yellow-400 border-yellow-400 hover:bg-yellow-400"><span className="flex items-center"><GodModeIcon className="w-5 h-5 mr-3" /> God Mode</span></Button>
-      </div>
-    </div>
-  );
-};
+    </ScreenWrapper>
+);
 
-const RosterScreen = ({ gameState, setScreen, onPlayerSelected }: { gameState: GameState, setScreen: (screen: Screen) => void, onPlayerSelected: (player: Player) => void }) => {
-    const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
+const MainMenu = ({ onNavigate, unreadMessages }: { onNavigate: (screen: Screen) => void, unreadMessages: number }) => (
+    <nav className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <Button onClick={() => onNavigate('ROSTER')}><RosterIcon className="w-6 h-6 inline-block mr-2" />Roster</Button>
+        <Button onClick={() => onNavigate('SCHEDULE')}><ScheduleIcon className="w-6 h-6 inline-block mr-2" />Schedule</Button>
+        <Button onClick={() => onNavigate('STANDINGS')}><StandingsIcon className="w-6 h-6 inline-block mr-2" />Standings</Button>
+        <Button onClick={() => onNavigate('NATIONAL_STATS')}><ChartIcon className="w-6 h-6 inline-block mr-2" />Leaders</Button>
+        <Button onClick={() => onNavigate('STAFF')}><CoachIcon className="w-6 h-6 inline-block mr-2" />Staff</Button>
+        <Button onClick={() => onNavigate('SPONSORS')}><SponsorIcon className="w-6 h-6 inline-block mr-2" />Sponsors</Button>
+        <Button onClick={() => onNavigate('TACTICS')}><TacticsIcon className="w-6 h-6 inline-block mr-2" />Tactics</Button>
+        <Button onClick={() => onNavigate('FACILITIES')}><FacilitiesIcon className="w-6 h-6 inline-block mr-2" />Facilities</Button>
+        <Button onClick={() => onNavigate('AWARD_RACES')}><AwardIcon className="w-6 h-6 inline-block mr-2" />Award Races</Button>
+        <Button onClick={() => onNavigate('TROPHY_CASE')}><TrophyIcon className="w-6 h-6 inline-block mr-2" />Trophy Case</Button>
+        <Button onClick={() => onNavigate('INBOX')}>
+            <InboxIcon className="w-6 h-6 inline-block mr-2" />
+            Inbox {unreadMessages > 0 && <span className="ml-2 bg-red-500 text-white rounded-full px-2 py-1 text-xs">{unreadMessages}</span>}
+        </Button>
+        <Button onClick={() => onNavigate('GOD_MODE')}><GodModeIcon className="w-6 h-6 inline-block mr-2" />God Mode</Button>
+    </nav>
+);
+
+const RosterScreen = ({ team, onPlayerSelect, onBack }: { team: Team, onPlayerSelect: (player: Player) => void, onBack: () => void }) => {
+    const [sortBy, setSortBy] = React.useState<keyof Player['attributes'] | 'position' | 'name'>('position');
+    
+    const sortedRoster = [...team.roster].sort((a, b) => {
+        if (sortBy === 'position') return a.position.localeCompare(b.position) || b.attributes.OVR - a.attributes.OVR;
+        if (sortBy === 'name') return a.name.localeCompare(b.name);
+        return b.attributes[sortBy] - a.attributes[sortBy];
+    });
 
     return (
-        <div>
-            <Header title="Roster" onBack={() => setScreen('MAIN_MENU')} />
-            <div className="p-2 md:p-4">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm md:text-base">
-                        <thead className="text-left text-gray-400 uppercase">
-                            <tr>
-                                <th className="p-2">Name</th>
-                                <th className="p-2">Pos</th>
-                                <th className="p-2">Yr</th>
-                                <th className="p-2">OVR</th>
-                                <th className="p-2">Stamina</th>
-                                <th className="p-2 hidden md:table-cell">Morale</th>
-                                <th className="p-2">Status</th>
+        <ScreenWrapper screenKey="ROSTER">
+            <h2 className="text-2xl font-press-start text-cyan-400 p-4">Roster</h2>
+            <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                    <thead>
+                        <tr className="bg-gray-800">
+                            {['Pos', 'Name', 'Year', 'OVR', 'Spd', 'Str', 'Stm', 'Tck', 'Ctch', 'Pass', 'Blk'].map(h => 
+                                <th key={h} className="p-2 uppercase">{h}</th>
+                            )}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sortedRoster.map(p => (
+                            <tr key={p.id} className={`border-b border-gray-700 ${p.isInjured > 0 ? 'bg-red-900/50' : ''}`} onClick={() => onPlayerSelect(p)}>
+                                <td className="p-2"><span className={`px-2 py-1 text-xs font-bold rounded ${getPositionColor(p.position)}`}>{p.position}</span></td>
+                                <td className="p-2">{p.name} {p.isInjured > 0 && <span className="text-red-500">(Inj {p.isInjured}w)</span>}</td>
+                                <td className="p-2">{p.year}</td>
+                                <td className={`p-2 font-bold ${getAttributeColor(p.attributes.OVR)}`}>{p.attributes.OVR}</td>
+                                <td className={`p-2 ${getAttributeColor(p.attributes.Speed)}`}>{p.attributes.Speed}</td>
+                                <td className={`p-2 ${getAttributeColor(p.attributes.Strength)}`}>{p.attributes.Strength}</td>
+                                <td className={`p-2 ${getAttributeColor(p.attributes.Stamina)}`}>{p.attributes.Stamina}</td>
+                                <td className={`p-2 ${getAttributeColor(p.attributes.Tackle)}`}>{p.attributes.Tackle}</td>
+                                <td className={`p-2 ${getAttributeColor(p.attributes.Catch)}`}>{p.attributes.Catch}</td>
+                                <td className={`p-2 ${getAttributeColor(p.attributes.Pass)}`}>{p.attributes.Pass}</td>
+                                <td className={`p-2 ${getAttributeColor(p.attributes.Block)}`}>{p.attributes.Block}</td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            {[...myTeam.roster].sort((a, b) => b.attributes.OVR - a.attributes.OVR).map(p => (
-                                <tr key={p.id} className="border-b border-gray-700 hover:bg-gray-800 cursor-pointer" onClick={() => onPlayerSelected(p)}>
-                                    <td className="p-2 font-bold">{p.name}</td>
-                                    <td className="p-2">{p.position}</td>
-                                    <td className="p-2">{p.year}</td>
-                                    <td className="p-2"><StatBar value={p.attributes.OVR} max={99} /></td>
-                                    <td className="p-2"><StatBar value={p.currentStamina}/></td>
-                                    <td className="p-2 hidden md:table-cell"><StatBar value={p.morale}/></td>
-                                    <td className="p-2">{p.isInjured > 0 ? <span className="text-red-500">INJ ({p.isInjured}w)</span> : <span className="text-green-400">OK</span>}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                        ))}
+                    </tbody>
+                </table>
             </div>
-        </div>
+            <Button onClick={onBack} className="mt-4">Back</Button>
+        </ScreenWrapper>
     );
 };
 
-const ScheduleScreen = ({ gameState, setScreen, onGameSelected }: { gameState: GameState; setScreen: (screen: Screen) => void; onGameSelected: (game: Game) => void; }) => {
-    const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
-    const mySchedule = gameState.schedule[myTeam.id];
-
-    const renderPlayoffBracket = () => {
-        if (!gameState.playoffBracket) return <p>No playoffs this season.</p>;
-
-        return (
-            <div className="flex justify-around font-mono text-sm">
-                {gameState.playoffBracket.map((roundData, roundIndex) => (
-                    <div key={roundIndex} className="flex flex-col justify-around">
-                        <h3 className="text-center font-press-start text-cyan-400 mb-4">{['Quarterfinals', 'Semifinals', 'Championship'][roundIndex]}</h3>
-                        <div className="space-y-8">
-                        {roundData.matchups.map((matchup, matchIndex) => {
-                            const team1 = gameState.teams.find(t => t.id === matchup.team1Id)!;
-                            const team2 = gameState.teams.find(t => t.id === matchup.team2Id)!;
-                            const winnerId = matchup.winnerId;
-                            return (
-                                <div key={matchIndex} className="p-2 bg-gray-800 border-l-4 border-gray-600">
-                                    <p className={`${winnerId === team1.id ? 'font-bold text-white' : winnerId ? 'text-gray-500' : ''}`}>{team1.name}</p>
-                                    <p className={`${winnerId === team2.id ? 'font-bold text-white' : winnerId ? 'text-gray-500' : ''}`}>{team2.name}</p>
-                                    {matchup.game?.result && <p className="text-xs text-cyan-400">{matchup.game.result.summary}</p>}
-                                </div>
-                            );
-                        })}
-                        </div>
+const PlayerEditModal = ({ player, onClose }: { player: Player, onClose: () => void }) => (
+    <Modal onClose={onClose} size="3xl">
+        <h2 className="text-2xl font-press-start text-cyan-400 mb-4">{player.name} ({player.position})</h2>
+        <div className="grid grid-cols-2 gap-4">
+            <div>
+                <h3 className="text-lg font-press-start">Attributes</h3>
+                {Object.entries(player.attributes).map(([key, value]) => (
+                    <div key={key} className="flex justify-between">
+                        <span>{key}</span>
+                        <span className={getAttributeColor(value)}>{value}</span>
                     </div>
                 ))}
             </div>
-        );
+            <div>
+                 <h3 className="text-lg font-press-start mb-2">Season Stats</h3>
+                {Object.entries(player.seasonStats).map(([key, value]) => (
+                    <div key={key} className="flex justify-between text-sm">
+                        <span>{key}</span>
+                        <span>{value}</span>
+                    </div>
+                ))}
+                 <h3 className="text-lg font-press-start mt-4 mb-2">Career Stats</h3>
+                {Object.entries(player.careerStats).map(([key, value]) => (
+                    <div key={key} className="flex justify-between text-sm">
+                        <span>{key}</span>
+                        <span>{value}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    </Modal>
+);
+
+const ScheduleScreen = ({ schedule, teams, myTeamId, week, onGameClick, onBack }: { schedule: Game[], teams: Team[], myTeamId: number, week: number, onGameClick: (game: Game, opponent: Team) => void, onBack: () => void }) => (
+    <ScreenWrapper screenKey="SCHEDULE">
+        <h2 className="text-2xl font-press-start text-cyan-400 p-4">Schedule</h2>
+        <div className="space-y-2 p-4">
+            {schedule.map(game => {
+                const opponent = teams.find(t => t.id === game.opponentId)!;
+                const isPast = game.week < week || (game.week === week && game.result);
+                const isCurrent = game.week === week && !game.result;
+                let bgColor = 'bg-gray-800/50';
+                if (isCurrent) bgColor = 'bg-yellow-800/50';
+                if (isPast && game.result) {
+                    bgColor = game.result.myScore > game.result.opponentScore ? 'bg-green-800/50' : 'bg-red-800/50';
+                }
+                
+                return (
+                    <div key={game.week} className={`p-4 border border-gray-600 ${bgColor} flex items-center justify-between cursor-pointer`} onClick={() => onGameClick(game, opponent)}>
+                        <div>
+                            <p className="font-bold">Week {game.week}{game.isRivalryGame && <span className="text-red-500"> (RIVALRY)</span>}</p>
+                            <p>{game.isHome ? 'vs' : '@'} {opponent.name} ({opponent.record.wins}-{opponent.record.losses})</p>
+                        </div>
+                        {game.result && (
+                            <p className="text-2xl font-press-start">{game.result.myScore} - {game.result.opponentScore}</p>
+                        )}
+                        {!game.result && (
+                            <div className="flex items-center">
+                               <ScoutIcon className="w-6 h-6 mr-2" />
+                               <span>Scout</span>
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+        <div className="p-4">
+            <Button onClick={onBack}>Back</Button>
+        </div>
+    </ScreenWrapper>
+);
+
+const ScoutingReportModal = ({ team, onClose }: { team: Team, onClose: () => void }) => {
+    const report = React.useMemo(() => GameService.generateScoutingReport(team), [team]);
+    return (
+        <Modal onClose={onClose} size="3xl">
+            <h2 className="text-2xl font-press-start text-cyan-400 mb-4">Scouting Report: {team.name}</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 className="text-xl font-press-start text-yellow-400 mb-2">Strengths</h3>
+                    <ul className="list-disc list-inside space-y-1">
+                        {report.strengths.map((s, i) => <li key={i}>{s}</li>)}
+                    </ul>
+                </div>
+                <div>
+                    <h3 className="text-xl font-press-start text-red-400 mb-2">Weaknesses</h3>
+                    <ul className="list-disc list-inside space-y-1">
+                        {report.weaknesses.map((w, i) => <li key={i}>{w}</li>)}
+                    </ul>
+                </div>
+            </div>
+            <div className="mt-6">
+                <h3 className="text-xl font-press-start text-green-400 mb-2">Key Players</h3>
+                <div className="space-y-2">
+                    {report.keyPlayers.map(p => (
+                        <div key={p.id} className="p-2 bg-gray-800 border border-gray-700 flex justify-between">
+                            <span>{p.name} ({p.position})</span>
+                            <span className="font-bold text-yellow-400">OVR: {p.attributes.OVR}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
+const GameSummaryModal = ({ game, myTeam, opponent, onClose }: { game: Game, myTeam: Team, opponent: Team, onClose: () => void }) => {
+    if (!game.result) return null;
+    const { myScore, opponentScore, playerStats } = game.result;
+    
+    const statHeaders: { key: keyof PlayerStats, label: string }[] = [
+        { key: 'passYds', label: 'Pass Yds' }, { key: 'passTDs', label: 'Pass TD' },
+        { key: 'rushYds', label: 'Rush Yds' }, { key: 'rushTDs', label: 'Rush TD' },
+        { key: 'recYds', label: 'Rec Yds' }, { key: 'recTDs', label: 'Rec TD' },
+        { key: 'tackles', label: 'Tackles' }, { key: 'sacks', label: 'Sacks' }, { key: 'ints', label: 'INT' },
+    ];
+
+    const getTopPerformers = (teamRoster: Player[], stats: Record<string, Partial<PlayerStats>>) => {
+        const performers: { player: Player, stat: string, value: number }[] = [];
+        statHeaders.forEach(header => {
+            const top = teamRoster.filter(p => stats[p.id] && stats[p.id][header.key]).sort((a, b) => (stats[b.id][header.key] ?? 0) - (stats[a.id][header.key] ?? 0))[0];
+            if (top && stats[top.id][header.key]! > 0) {
+                performers.push({ player: top, stat: header.label, value: stats[top.id][header.key]! });
+            }
+        });
+        return performers.filter((p, i, self) => i === self.findIndex(t => t.player.id === p.player.id)).slice(0, 4); // Unique players
     };
+    
+    const myTopPerformers = getTopPerformers(myTeam.roster, playerStats.myTeam);
+    const oppTopPerformers = getTopPerformers(opponent.roster, playerStats.opponentTeam);
 
     return (
-        <div>
-            <Header title="Schedule" onBack={() => setScreen('MAIN_MENU')} />
-            <div className="p-4 md:p-8 max-w-5xl mx-auto">
-                {mySchedule && mySchedule.length > 0 ? (
-                    <div className="space-y-2">
-                        {mySchedule.map(game => {
-                            const opponent = gameState.teams.find(t => t.id === game.opponentId)!;
-                            let resultText = '';
-                            let resultColor = 'text-gray-400';
+        <Modal onClose={onClose} size="4xl">
+            <h2 className="text-2xl font-press-start text-cyan-400 mb-4 text-center">Game Summary</h2>
+            <div className="text-center mb-6">
+                <p className="text-xl">{myTeam.name} vs {opponent.name}</p>
+                <p className={`text-4xl font-bold ${myScore > opponentScore ? 'text-green-400' : 'text-red-400'}`}>
+                    {myScore} - {opponentScore}
+                </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 className="text-xl font-press-start text-yellow-400 mb-2">{myTeam.name} - Top Performers</h3>
+                     <div className="space-y-2">
+                        {myTopPerformers.length > 0 ? myTopPerformers.map(({player, stat, value}) => (
+                           <p key={player.id}>{player.name} ({player.position}): {value} {stat}</p>
+                        )) : <p>No notable performers.</p>}
+                    </div>
+                </div>
+                <div>
+                    <h3 className="text-xl font-press-start text-yellow-400 mb-2">{opponent.name} - Top Performers</h3>
+                     <div className="space-y-2">
+                         {oppTopPerformers.length > 0 ? oppTopPerformers.map(({player, stat, value}) => (
+                           <p key={player.id}>{player.name} ({player.position}): {value} {stat}</p>
+                        )) : <p>No notable performers.</p>}
+                    </div>
+                </div>
+            </div>
+        </Modal>
+    );
+};
 
-                            if (game.result) {
-                                const won = game.result.myScore > game.result.opponentScore;
-                                resultText = `${won ? 'W' : 'L'} ${game.result.summary}`;
-                                resultColor = won ? 'text-green-400' : 'text-red-400';
-                            }
+const StandingsScreen = ({ teams, rankings, myTeamId, onBack }: { teams: Team[], rankings: { teamId: number, rank: number }[], myTeamId: number, onBack: () => void }) => (
+    <ScreenWrapper screenKey="STANDINGS">
+        <h2 className="text-2xl font-press-start text-cyan-400 p-4">National Rankings</h2>
+        <div className="p-4">
+            {rankings.map(({ teamId, rank }) => {
+                const team = teams.find(t => t.id === teamId)!;
+                return (
+                    <div key={teamId} className={`flex justify-between p-2 ${teamId === myTeamId ? 'bg-cyan-900' : ''}`}>
+                        <span>#{rank} {team.name}</span>
+                        <span>({team.record.wins}-{team.record.losses}) OVR: {team.ovr}</span>
+                    </div>
+                );
+            })}
+        </div>
+        <div className="p-4">
+            <Button onClick={onBack}>Back</Button>
+        </div>
+    </ScreenWrapper>
+);
 
+const NationalStatsScreen = ({ teams, onBack }: { teams: Team[], onBack: () => void }) => {
+    const leaders = React.useMemo(() => GameService.getNationalLeaders(teams), [teams]);
+    return (
+        <ScreenWrapper screenKey="NATIONAL_STATS">
+            <h2 className="text-2xl font-press-start text-cyan-400 p-4">National Leaders</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
+                {Object.entries(leaders).map(([stat, players]) => (
+                    <div key={stat} className="bg-gray-800 p-4">
+                        <h3 className="font-press-start text-lg text-yellow-400 mb-2">{stat}</h3>
+                        {/* FIX: Cast 'players' to Player[] to resolve 'map' does not exist on type 'unknown' error. */}
+                        {(players as Player[]).map((p, i) => (
+                            <div key={p.id} className="flex justify-between text-sm">
+                                <span>{i+1}. {p.name}</span>
+                                <span>{p.seasonStats[stat as keyof PlayerStats]}</span>
+                            </div>
+                        ))}
+                    </div>
+                ))}
+            </div>
+            <div className="p-4">
+                <Button onClick={onBack}>Back</Button>
+            </div>
+        </ScreenWrapper>
+    );
+};
+
+const FacilitiesScreen = ({ facilities, funds, onUpgrade, onBack }: { facilities: GameState['facilities'], funds: number, onUpgrade: (facility: keyof GameState['facilities']) => void, onBack: () => void }) => (
+    <ScreenWrapper screenKey="FACILITIES">
+        <h2 className="text-2xl font-press-start text-cyan-400 p-4">Facilities</h2>
+        <div className="space-y-4 p-4">
+            {Object.entries(facilities).map(([key, facility]) => (
+                <div key={key} className="bg-gray-800 p-4">
+                    <h3 className="font-press-start text-lg capitalize text-yellow-400">{key}</h3>
+                    <p>Level: {facility.level}</p>
+                    <p>Upgrade Cost: ${facility.cost.toLocaleString()}</p>
+                    <Button onClick={() => onUpgrade(key as keyof GameState['facilities'])} disabled={funds < facility.cost} className="mt-2">
+                        Upgrade
+                    </Button>
+                </div>
+            ))}
+        </div>
+        <div className="p-4">
+            <Button onClick={onBack}>Back</Button>
+        </div>
+    </ScreenWrapper>
+);
+
+const TacticsScreen = ({ strategy, onStrategyChange, onBack }: { strategy: GameStrategy, onStrategyChange: (newStrategy: GameStrategy) => void, onBack: () => void }) => {
+    const offensivePlaybooks: OffensivePlaybook[] = ['Balanced', 'Spread', 'Pro-Style', 'Run Heavy', 'Air Raid'];
+    const defensivePlaybooks: DefensivePlaybook[] = ['4-3 Defense', '3-4 Defense', 'Nickel', 'Aggressive'];
+
+    return (
+        <ScreenWrapper screenKey="TACTICS">
+             <h2 className="text-2xl font-press-start text-cyan-400 p-4">Tactics</h2>
+             <div className="p-4 space-y-8">
+                 <div>
+                     <h3 className="text-xl font-press-start text-yellow-400 mb-4">Offensive Playbook</h3>
+                     <div className="grid grid-cols-2 gap-4">
+                         {offensivePlaybooks.map(pb => (
+                             <Button key={pb} onClick={() => onStrategyChange({ ...strategy, offense: pb })} className={strategy.offense === pb ? 'bg-cyan-400 text-black' : ''}>
+                                 {pb}
+                             </Button>
+                         ))}
+                     </div>
+                 </div>
+                 <div>
+                     <h3 className="text-xl font-press-start text-yellow-400 mb-4">Defensive Playbook</h3>
+                     <div className="grid grid-cols-2 gap-4">
+                         {defensivePlaybooks.map(pb => (
+                              <Button key={pb} onClick={() => onStrategyChange({ ...strategy, defense: pb })} className={strategy.defense === pb ? 'bg-cyan-400 text-black' : ''}>
+                                 {pb}
+                             </Button>
+                         ))}
+                     </div>
+                 </div>
+             </div>
+             <div className="p-4">
+                <Button onClick={onBack}>Back</Button>
+            </div>
+        </ScreenWrapper>
+    );
+};
+
+const StaffScreen = ({ gameState, onHire, onBack }: { gameState: GameState, onHire: (staffId: string) => void, onBack: () => void }) => {
+    return (
+        <ScreenWrapper screenKey="STAFF">
+            <h2 className="text-2xl font-press-start text-cyan-400 p-4">Staff</h2>
+            <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                    <h3 className="text-xl font-press-start text-yellow-400 mb-4">Your Staff</h3>
+                    <div className="space-y-4">
+                        {['OC', 'DC', 'Trainer', 'Doctor'].map(type => {
+                            const member = gameState.staff.find(s => s.type === type);
                             return (
-                                <div key={`${game.week}-${game.opponentId}`} className={`p-4 flex justify-between items-center cursor-pointer hover:bg-gray-700 ${game.week < gameState.week ? 'bg-gray-800' : 'bg-gray-800/50'}`} onClick={() => onGameSelected(game)}>
-                                    <div className="flex items-center">
-                                        <span className="w-8 text-gray-500">W{game.week}</span>
-                                        <span>{game.isHome ? 'vs' : '@'} {opponent.name}</span>
-                                        {game.isRivalryGame && <span className="ml-4 text-xs font-bold text-red-500 uppercase">Rivalry</span>}
-                                        <span className="ml-4 text-xs text-gray-400">({game.weather})</span>
-                                    </div>
-                                    <div className={`font-bold text-lg ${resultColor}`}>{resultText}</div>
+                                <div key={type} className="bg-gray-800 p-3">
+                                    <p className="font-bold text-lg">{type}</p>
+                                    {member ? (
+                                        <>
+                                            <p>{member.name}</p>
+                                            <p>Rating: <span className={getAttributeColor(member.rating)}>{member.rating}</span></p>
+                                        </>
+                                    ) : <p className="text-gray-500">Position Vacant</p>}
                                 </div>
                             );
                         })}
                     </div>
-                ) : (
-                    renderPlayoffBracket()
-                )}
+                </div>
+                 <div>
+                    <h3 className="text-xl font-press-start text-yellow-400 mb-4">Staff Market</h3>
+                     <div className="space-y-4">
+                        {gameState.staffMarket.map(staff => (
+                            <div key={staff.id} className="bg-gray-800 p-3">
+                                <p className="font-bold text-lg">{staff.name} ({staff.type})</p>
+                                <p>Rating: <span className={getAttributeColor(staff.rating)}>{staff.rating}</span></p>
+                                <p>Salary: <span className="text-green-400">${staff.salary.toLocaleString()}</span></p>
+                                <Button onClick={() => onHire(staff.id)} disabled={gameState.funds < staff.salary} className="mt-2 text-sm p-2">
+                                    Hire
+                                </Button>
+                            </div>
+                        ))}
+                     </div>
+                </div>
             </div>
-        </div>
+            <div className="p-4">
+                <Button onClick={onBack}>Back</Button>
+            </div>
+        </ScreenWrapper>
     );
 };
 
-const StandingsScreen = ({ gameState, setScreen }: { gameState: GameState, setScreen: (screen: Screen) => void }) => (
-    <div>
-        <Header title="National Standings" onBack={() => setScreen('MAIN_MENU')} />
-        <div className="p-4 md:p-8 max-w-3xl mx-auto">
-            <h2 className="font-press-start text-xl text-cyan-400 mb-4">Top 25 Poll</h2>
-            <div className="space-y-1">
-                {gameState.nationalRankings.map(({teamId, rank}) => {
-                    const team = gameState.teams.find(t => t.id === teamId)!;
-                    const isMyTeam = team.id === gameState.myTeamId;
+const SponsorsScreen = ({ gameState, onSelect, onBack }: { gameState: GameState, onSelect: (sponsorId: string) => void, onBack: () => void }) => {
+    return (
+        <ScreenWrapper screenKey="SPONSORS">
+            <h2 className="text-2xl font-press-start text-cyan-400 p-4">Sponsors</h2>
+            <div className="p-4 space-y-8">
+                <div>
+                    <h3 className="text-xl font-press-start text-yellow-400 mb-4">Active Sponsor</h3>
+                    {gameState.activeSponsor ? (
+                        <div className="bg-gray-800 p-4">
+                             <p className="font-bold text-lg">{gameState.activeSponsor.name}</p>
+                             <p>Payout per Win: <span className="text-green-400">${gameState.activeSponsor.payoutPerWin.toLocaleString()}</span></p>
+                             <p>Seasons Remaining: {gameState.activeSponsor.duration}</p>
+                        </div>
+                    ) : <p className="text-gray-500">No active sponsor.</p>}
+                </div>
+                 <div>
+                    <h3 className="text-xl font-press-start text-yellow-400 mb-4">Available Offers</h3>
+                     <div className="space-y-4">
+                        {gameState.availableSponsors.map(sponsor => (
+                            <div key={sponsor.id} className="bg-gray-800 p-4">
+                                <p className="font-bold text-lg">{sponsor.name} ({sponsor.type})</p>
+                                <p>Signing Bonus: <span className="text-green-400">${sponsor.signingBonus.toLocaleString()}</span></p>
+                                <p>Payout per Win: <span className="text-green-400">${sponsor.payoutPerWin.toLocaleString()}</span></p>
+                                <p>Duration: {sponsor.duration} season(s)</p>
+                                <Button onClick={() => onSelect(sponsor.id)} disabled={!!gameState.activeSponsor} className="mt-2 text-sm p-2">
+                                    {!!gameState.activeSponsor ? 'Deal Active' : 'Accept Deal'}
+                                </Button>
+                            </div>
+                        ))}
+                     </div>
+                </div>
+            </div>
+            <div className="p-4">
+                <Button onClick={onBack}>Back</Button>
+            </div>
+        </ScreenWrapper>
+    );
+};
+
+const AwardRacesScreen = ({ gameState, onBack }: { gameState: GameState, onBack: () => void }) => {
+    const awardRaces = React.useMemo(() => GameService.calculateAwardRaces(gameState.teams), [gameState.teams]);
+    
+    return (
+        <ScreenWrapper screenKey="AWARD_RACES">
+             <h2 className="text-2xl font-press-start text-cyan-400 p-4">Mid-Season Award Races</h2>
+             <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {Object.entries(awardRaces).map(([award, candidates]) => {
+                    {/* FIX: Cast 'candidates' to a specific type to resolve errors with 'length' and 'map' on type 'unknown'. */}
+                    const typedCandidates = candidates as {player: Player, teamName: string}[];
                     return (
-                        <div key={teamId} className={`p-3 flex items-center ${isMyTeam ? 'bg-cyan-900/50 border border-cyan-400' : 'bg-gray-800/50'}`}>
-                           <span className="font-bold w-10">{rank}.</span>
-                           <span className="flex-grow">{team.name}</span>
-                           <span className="font-mono">({team.record.wins}-{team.record.losses})</span>
+                        <div key={award} className="bg-gray-800 p-4">
+                            <h3 className="font-press-start text-lg text-yellow-400 mb-2">{award}</h3>
+                            {typedCandidates.length > 0 ? (
+                                typedCandidates.map(({player, teamName}, index) => (
+                                    <div key={player.id} className="text-sm">
+                                        <p>{index + 1}. {player.name} ({player.position}) - {teamName.split(' ')[0]}</p>
+                                    </div>
+                                ))
+                            ) : <p className="text-gray-500">No clear frontrunner.</p>}
                         </div>
                     );
                 })}
+             </div>
+             <div className="p-4">
+                <Button onClick={onBack}>Back</Button>
             </div>
-        </div>
-    </div>
-);
+        </ScreenWrapper>
+    );
+};
 
-const StatVisualBar = ({ value, maxValue }: { value: number, maxValue: number }) => {
-    const percentage = maxValue > 0 ? (value / maxValue) * 100 : 0;
+const InboxScreen = ({ gameState, onRead, onDelete, onBack }: { gameState: GameState, onRead: (id: string) => void, onDelete: (id: string) => void, onBack: () => void }) => {
+    const [selectedMessage, setSelectedMessage] = React.useState<InboxMessage | null>(null);
+
+    const handleSelectMessage = (message: InboxMessage) => {
+        setSelectedMessage(message);
+        onRead(message.id);
+    };
+
     return (
-        <div className="w-full h-4 bg-gray-700 border border-gray-600">
-            <div className="bg-cyan-500 h-full" style={{ width: `${percentage}%` }}></div>
-        </div>
+        <ScreenWrapper screenKey="INBOX">
+            <h2 className="text-2xl font-press-start text-cyan-400 p-4">Inbox</h2>
+            <div className="p-4 space-y-2">
+                {gameState.inbox.length === 0 && <p>Your inbox is empty.</p>}
+                {gameState.inbox.slice().reverse().map(msg => (
+                    <div key={msg.id} className={`p-3 border border-gray-700 cursor-pointer ${msg.read ? 'bg-gray-800/60' : 'bg-cyan-900/50'}`} onClick={() => handleSelectMessage(msg)}>
+                        <div className="flex justify-between">
+                            <p className="font-bold">{msg.from}: {msg.subject}</p>
+                            <p className="text-sm text-gray-400">S{msg.season} W{msg.week}</p>
+                        </div>
+                        <p className="truncate text-sm text-gray-300">{msg.body}</p>
+                    </div>
+                ))}
+            </div>
+            <div className="p-4">
+                <Button onClick={onBack}>Back</Button>
+            </div>
+            
+            {selectedMessage && (
+                <Modal onClose={() => setSelectedMessage(null)} size="3xl">
+                    <h3 className="font-press-start text-xl text-cyan-400 mb-2">{selectedMessage.subject}</h3>
+                    <p className="text-gray-400 mb-4">From: {selectedMessage.from}</p>
+                    <p className="whitespace-pre-wrap">{selectedMessage.body}</p>
+                    <div className="mt-6 flex gap-4">
+                        <Button onClick={() => setSelectedMessage(null)} className="text-center justify-center">Close</Button>
+                        <Button onClick={() => { onDelete(selectedMessage.id); setSelectedMessage(null); }} className="text-center justify-center border-red-500 hover:bg-red-500">Delete</Button>
+                    </div>
+                </Modal>
+            )}
+        </ScreenWrapper>
     );
 };
 
 
-const NationalStatsScreen = ({ gameState, setScreen, onPlayerSelected }: { gameState: GameState, setScreen: (screen: Screen) => void, onPlayerSelected: (player: Player) => void }) => {
-    const [leaders, setLeaders] = React.useState<Record<string, Player[]>>({});
-    const [statCategory, setStatCategory] = React.useState<keyof PlayerStats>('passYds');
+const GodModeScreen = ({ onToggleForceWin, forceWin, onBack }: { onToggleForceWin: () => void, forceWin: boolean, onBack: () => void }) => (
+    <ScreenWrapper screenKey="GOD_MODE">
+        <h2 className="text-2xl font-press-start text-cyan-400 p-4">God Mode</h2>
+        <div className="p-4">
+            <Button onClick={onToggleForceWin}>
+                Force Win Next Game: {forceWin ? 'ON' : 'OFF'}
+            </Button>
+        </div>
+        <div className="p-4">
+            <Button onClick={onBack}>Back</Button>
+        </div>
+    </ScreenWrapper>
+);
 
-    React.useEffect(() => {
-        setLeaders(GameService.getNationalLeaders(gameState.teams));
-    }, [gameState.teams]);
-
-    const statLabels: Record<keyof PlayerStats, string> = {
-        passYds: 'Passing Yards', passTDs: 'Passing TDs', rushYds: 'Rushing Yards', rushTDs: 'Rushing TDs',
-        recYds: 'Receiving Yards', recTDs: 'Receiving TDs', tackles: 'Tackles', sacks: 'Sacks', ints: 'Interceptions',
-        gamesPlayed: 'Games Played'
-    };
-
-    const currentLeaders = leaders[statCategory] || [];
-    const maxValue = currentLeaders.length > 0 ? currentLeaders[0].seasonStats[statCategory] : 0;
-
-    return (
-        <div>
-            <Header title="National Leaders" onBack={() => setScreen('MAIN_MENU')} />
-            <div className="p-4 md:p-8 max-w-5xl mx-auto">
-                <div className="flex flex-wrap justify-center gap-2 mb-6">
-                    {Object.keys(statLabels).filter(s => s !== 'gamesPlayed').map(key => (
-                         <button 
-                            key={key}
-                            onClick={() => setStatCategory(key as keyof PlayerStats)}
-                            className={`px-3 py-1 text-sm font-press-start ${statCategory === key ? 'bg-cyan-400 text-black' : 'bg-gray-700'}`}
-                         >
-                             {statLabels[key as keyof PlayerStats]}
-                         </button>
-                    ))}
+const TrophyCaseScreen = ({ trophies, onBack }: { trophies: Trophy[], onBack: () => void }) => (
+    <ScreenWrapper screenKey="TROPHY_CASE">
+        <h2 className="text-2xl font-press-start text-cyan-400 p-4">Trophy Case</h2>
+        <div className="p-4 space-y-2">
+            {trophies.length === 0 && <p>Your trophy case is empty. Go win something!</p>}
+            {trophies.map((trophy, i) => (
+                <div key={i} className="bg-gray-800 p-3">
+                    <p className="font-bold text-yellow-400">S{trophy.season} - {trophy.award}</p>
+                    {trophy.playerName && <p>{trophy.playerName}</p>}
                 </div>
-                <div>
-                    <h2 className="font-press-start text-xl text-cyan-400 mb-4">{statLabels[statCategory]}</h2>
-                     <table className="w-full text-sm md:text-base">
-                        <thead className="text-left text-gray-400 uppercase">
-                            <tr>
-                                <th className="p-2 w-8">#</th>
-                                <th className="p-2 w-1/3">Name</th>
-                                <th className="p-2 w-1/3 hidden md:table-cell">Team</th>
-                                <th className="p-2 text-right">Stat</th>
-                                <th className="p-2 w-1/3"> </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {currentLeaders.map((p, index) => {
-                                const team = gameState.teams.find(t => t.roster.some(pl => pl.id === p.id));
-                                return (
-                                <tr key={p.id} className="border-b border-gray-700 hover:bg-gray-800 cursor-pointer" onClick={() => onPlayerSelected(p)}>
-                                    <td className="p-2">{index + 1}</td>
-                                    <td className="p-2 font-bold">{p.name} <span className="text-gray-400">({p.position}, {p.year})</span></td>
-                                    <td className="p-2 text-xs hidden md:table-cell">{team?.name}</td>
-                                    <td className="p-2 text-right font-bold text-cyan-300 w-16">{p.seasonStats[statCategory]}</td>
-                                    <td className="p-2"><StatVisualBar value={p.seasonStats[statCategory]} maxValue={maxValue} /></td>
+            ))}
+        </div>
+         <div className="p-4">
+            <Button onClick={onBack}>Back</Button>
+        </div>
+    </ScreenWrapper>
+);
+
+
+const RecruitmentScreen = ({ recruits, recruitingPoints, onSign, onFinish, signedRecruits }: { recruits: Recruit[], recruitingPoints: number, onSign: (recruit: Recruit) => void, onFinish: () => void, signedRecruits: Recruit[] }) => (
+    <ScreenWrapper screenKey="RECRUITMENT">
+        <div className="p-4">
+            <h2 className="text-2xl font-press-start text-cyan-400 mb-2">Recruiting Class</h2>
+            <p className="text-lg text-yellow-400 mb-4">Points: {recruitingPoints}</p>
+             <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                    <thead>
+                        <tr className="bg-gray-800">
+                            {['Pos', 'Name', 'OVR', 'Pot', 'Cost', 'Action'].map(h => 
+                                <th key={h} className="p-2 uppercase">{h}</th>
+                            )}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {recruits.map(r => {
+                            const hasSigned = signedRecruits.some(sr => sr.id === r.id);
+                            return (
+                                <tr key={r.id} className={`border-b border-gray-700 ${hasSigned ? 'opacity-50' : ''}`}>
+                                    <td className="p-2"><span className={`px-2 py-1 text-xs font-bold rounded ${getPositionColor(r.position)}`}>{r.position}</span></td>
+                                    <td className="p-2">{r.name}</td>
+                                    <td className={`p-2 font-bold ${getAttributeColor(r.attributes.OVR)}`}>{r.attributes.OVR}</td>
+                                    <td className={`p-2 ${getAttributeColor(r.attributes.Potential)}`}>{r.attributes.Potential}</td>
+                                    <td className="p-2 text-yellow-400">{r.cost}</td>
+                                    <td className="p-2">
+                                        <Button onClick={() => onSign(r)} disabled={recruitingPoints < r.cost || hasSigned} className="p-2 text-sm">
+                                            {hasSigned ? 'Signed' : 'Sign'}
+                                        </Button>
+                                    </td>
                                 </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                            );
+                        })}
+                    </tbody>
+                </table>
             </div>
+            <Button onClick={onFinish} className="mt-4">Finish Recruiting</Button>
         </div>
-    );
-}
-
-const FacilitiesScreen = ({ gameState, setGameState, setScreen }: { gameState: GameState, setGameState: React.Dispatch<React.SetStateAction<GameState | null>>, setScreen: (screen: Screen) => void }) => {
-    const upgradeFacility = (facility: keyof GameState['facilities']) => {
-        setGameState(prev => {
-            if (!prev) return null;
-            const current = prev.facilities[facility];
-            if (prev.funds >= current.cost) {
-                return {
-                    ...prev,
-                    funds: prev.funds - current.cost,
-                    facilities: { ...prev.facilities, [facility]: { level: current.level + 1, cost: Math.floor(current.cost * 2.5) } }
-                }
-            }
-            return prev;
-        });
-    };
-    
-    const descriptions = {
-        coaching: "Better coaching improves player development in the offseason.",
-        training: "Improves weekly stamina recovery for all players.",
-        rehab: "Reduces the duration of player injuries."
-    };
-
-    return (
-        <div>
-            <Header title="Facilities" onBack={() => setScreen('MAIN_MENU')} />
-            <div className="p-4 md:p-8 max-w-3xl mx-auto">
-                <p className="text-center mb-6">Funds: <span className="font-bold text-green-400">${gameState.funds.toLocaleString()}</span></p>
-                <div className="space-y-6">
-                    {Object.entries(gameState.facilities).map(([key, facility]) => (
-                        <div key={key} className="p-4 bg-gray-800/50 border border-gray-700">
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <h3 className="font-press-start text-lg capitalize">{key}</h3>
-                                    <p className="text-gray-400">Current Level: {facility.level}</p>
-                                </div>
-                                <Button 
-                                    onClick={() => upgradeFacility(key as keyof GameState['facilities'])} 
-                                    disabled={gameState.funds < facility.cost} 
-                                    className="w-auto !text-center text-sm"
-                                >
-                                    Upgrade for ${facility.cost.toLocaleString()}
-                                </Button>
-                            </div>
-                            <p className="text-sm text-gray-500 mt-2">{descriptions[key as keyof typeof descriptions]}</p>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const AwardCard: React.FC<{title: string, player: Player | null}> = ({ title, player }) => (
-    <div className="bg-gray-800 p-4">
-        <h3 className="font-press-start text-yellow-400 text-lg">{title}</h3>
-        {player ? (
-            <p className="text-white mt-2">{player.name} <span className="text-gray-400">({player.position})</span></p>
-        ) : <p className="text-gray-500 mt-2">N/A</p>}
-    </div>
+    </ScreenWrapper>
 );
 
-const AwardsScreen = ({ gameState, setScreen }: { gameState: GameState, setScreen: (screen: Screen) => void }) => {
-    const { mvp, allAmerican, ...positionalAwards } = gameState.seasonAwards || { mvp: null, allAmerican: [] };
+const TrainingCampScreen = ({ roster, recruits, funds, onFinish, onSelectProgram, selections }: { roster: Player[], recruits: Recruit[], funds: number, onFinish: (selections: Record<string, TrainingProgram>) => void, onSelectProgram: (playerId: string, program: TrainingProgram) => void, selections: Record<string, TrainingProgram> }) => {
+    const combinedRoster = [...roster, ...recruits];
+    const programs: TrainingProgram[] = ['NONE', 'CONDITIONING', 'STRENGTH', 'AGILITY', 'PASSING', 'RECEIVING', 'TACKLING'];
+    const programCosts: Record<TrainingProgram, number> = { 'NONE': 0, 'CONDITIONING': 5000, 'STRENGTH': 15000, 'AGILITY': 15000, 'PASSING': 25000, 'RECEIVING': 25000, 'TACKLING': 25000 };
+
+    const totalCost = Object.values(selections).reduce((sum, prog) => sum + (programCosts[prog] || 0), 0);
+    const remainingFunds = funds - totalCost;
 
     return (
-        <div>
-            <Header title="Season Awards" onBack={() => setScreen('MAIN_MENU')} />
-            <div className="p-4 md:p-8 max-w-5xl mx-auto text-center">
-                {gameState.isOffseason ? (
-                    <div>
-                        <AwardCard title="National MVP" player={mvp} />
-                        <h2 className="font-press-start text-2xl text-yellow-400 my-8">Positional Awards</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {Object.entries(positionalAwards).map(([key, player]) => (
-                                <AwardCard key={key} title={key.replace('best', 'Best ')} player={player as Player} />
-                            ))}
-                        </div>
-                    </div>
-                ) : (
-                    <p className="text-gray-400">Awards are announced during the offseason.</p>
-                )}
-            </div>
-        </div>
-    );
-};
-
-const TrophyCaseScreen = ({ gameState, setScreen }: { gameState: GameState, setScreen: (screen: Screen) => void }) => {
-    const trophiesBySeason: Record<number, Trophy[]> = {};
-    gameState.trophyCase.forEach(trophy => {
-        if (!trophiesBySeason[trophy.season]) {
-            trophiesBySeason[trophy.season] = [];
-        }
-        trophiesBySeason[trophy.season].push(trophy);
-    });
-    const sortedSeasons = Object.keys(trophiesBySeason).map(Number).sort((a, b) => b - a);
-
-    return (
-        <div>
-            <Header title="Trophy Case" onBack={() => setScreen('MAIN_MENU')} />
-            <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-8">
-                {sortedSeasons.length > 0 ? sortedSeasons.map(season => (
-                    <div key={season}>
-                        <h2 className="font-press-start text-2xl text-cyan-400 border-b-2 border-cyan-400 pb-2 mb-4">Season {season}</h2>
-                        <div className="space-y-2">
-                            {trophiesBySeason[season].map((trophy, index) => (
-                                <div key={index} className="p-3 bg-gray-800 flex items-center gap-4">
-                                    <TrophyIcon className="w-8 h-8 text-yellow-400"/>
-                                    <div>
-                                        <p className="font-bold text-lg">{trophy.award}</p>
-                                        {trophy.playerName && <p className="text-gray-400">{trophy.playerName}</p>}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )) : (
-                    <p className="text-center text-gray-500 text-lg">Your trophy case is empty. Go win some championships!</p>
-                )}
-            </div>
-        </div>
-    );
-};
-
-const TacticsScreen = ({ gameState, setGameState, setScreen }: { gameState: GameState, setGameState: React.Dispatch<React.SetStateAction<GameState | null>>, setScreen: (screen: Screen) => void }) => {
-    const offensivePlaybooks: OffensivePlaybook[] = ['Balanced', 'Spread', 'Pro-Style', 'Run Heavy', 'Air Raid'];
-    const defensivePlaybooks: DefensivePlaybook[] = ['4-3 Defense', '3-4 Defense', 'Nickel', 'Aggressive'];
-
-    const setStrategy = (type: 'offense' | 'defense', value: OffensivePlaybook | DefensivePlaybook) => {
-        setGameState(prev => {
-            if (!prev) return null;
-            return {
-                ...prev,
-                myStrategy: {
-                    ...prev.myStrategy,
-                    [type]: value,
-                }
-            };
-        });
-    };
-    
-    return (
-        <div>
-            <Header title="Tactics" onBack={() => setScreen('MAIN_MENU')} />
-            <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-8">
-                <div>
-                    <h2 className="font-press-start text-xl text-cyan-400 mb-4">Offensive Playbook</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {offensivePlaybooks.map(p => (
-                            <button key={p} onClick={() => setStrategy('offense', p)}
-                                className={`p-4 border-2 text-left transition-colors ${gameState.myStrategy.offense === p ? 'bg-cyan-400 text-black border-cyan-400' : 'bg-gray-800 border-gray-600 hover:bg-gray-700'}`}>
-                                {p}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-                 <div>
-                    <h2 className="font-press-start text-xl text-cyan-400 mb-4">Defensive Playbook</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {defensivePlaybooks.map(p => (
-                            <button key={p} onClick={() => setStrategy('defense', p)}
-                                className={`p-4 border-2 text-left transition-colors ${gameState.myStrategy.defense === p ? 'bg-cyan-400 text-black border-cyan-400' : 'bg-gray-800 border-gray-600 hover:bg-gray-700'}`}>
-                                {p}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const GodModeScreen = ({ gameState, setGameState, setScreen }: { gameState: GameState, setGameState: React.Dispatch<React.SetStateAction<GameState | null>>, setScreen: (screen: Screen) => void }) => {
-    const [fundsInput, setFundsInput] = React.useState(gameState.funds.toString());
-    const [editingPlayer, setEditingPlayer] = React.useState<Player | null>(null);
-
-    const handleSetFunds = () => {
-        const amount = parseInt(fundsInput, 10);
-        if (!isNaN(amount)) {
-            setGameState(p => p ? { ...p, funds: amount } : p);
-        }
-    };
-
-    const GodModeAction = (action: 'heal' | 'morale' | 'stamina') => {
-        setGameState(prev => {
-            if (!prev) return null;
-            const newTeams = JSON.parse(JSON.stringify(prev.teams));
-            const myTeam = newTeams.find((t: Team) => t.id === prev.myTeamId);
-            if(myTeam) {
-                myTeam.roster.forEach((p: Player) => {
-                    if (action === 'heal') p.isInjured = 0;
-                    if (action === 'morale') p.morale = 100;
-                    if (action === 'stamina') p.currentStamina = 100;
-                });
-            }
-            return { ...prev, teams: newTeams };
-        });
-    };
-    
-    // Player Edit Modal Component
-    const PlayerEditModal = ({ player, onClose }: { player: Player, onClose: () => void }) => {
-        const [localPlayer, setLocalPlayer] = React.useState<Player>(player);
-
-        React.useEffect(() => {
-            setLocalPlayer(player);
-        }, [player]);
-
-        const handleAttributeChange = (attr: keyof Player['attributes'], value: number) => {
-            const newAttributes = { ...localPlayer.attributes, [attr]: value };
-            // FIX: Cast `val` to number to resolve TypeScript error with `reduce`.
-            const total = Object.entries(newAttributes).reduce((sum, [key, val]) => (key !== 'OVR' ? sum + (val as number) : sum), 0);
-            newAttributes.OVR = Math.round(total / (Object.keys(newAttributes).length - 1));
-            setLocalPlayer({ ...localPlayer, attributes: newAttributes });
-        };
-        
-        const handleNameChange = (newName: string) => {
-            setLocalPlayer({ ...localPlayer, name: newName });
-        };
-
-        const handleSaveChanges = () => {
-            setGameState(prev => {
-                if (!prev) return null;
-                const newTeams = JSON.parse(JSON.stringify(prev.teams));
-                const myTeam = newTeams.find((t: Team) => t.id === prev.myTeamId);
-                const playerIndex = myTeam.roster.findIndex((p: Player) => p.id === localPlayer.id);
-                if (playerIndex > -1) {
-                    myTeam.roster[playerIndex] = localPlayer;
-                }
-                return { ...prev, teams: newTeams };
-            });
-            onClose();
-        };
-
-        return (
-            <Modal onClose={onClose} size="2xl">
-                <div className="flex justify-between items-center">
-                    <h2 className="font-press-start text-xl text-cyan-400 mb-4">Edit Player</h2>
-                    <button onClick={onClose} className="text-2xl text-gray-500 hover:text-white">&times;</button>
-                </div>
-                <div className="mb-4">
-                    <label className="block text-gray-400">Name</label>
-                    <input type="text" value={localPlayer.name} onChange={e => handleNameChange(e.target.value)} className="w-full p-2 bg-gray-800 border-2 border-gray-600 text-white" />
-                </div>
-                <div className="space-y-2">
-                    <p className="font-bold">OVR: {localPlayer.attributes.OVR}</p>
-                    {Object.entries(localPlayer.attributes).map(([key, value]) => {
-                        const attrKey = key as keyof Player['attributes'];
-                        if (attrKey === 'OVR') return null;
-                        return (
-                            <div key={key} className="flex items-center justify-between">
-                                <label className="capitalize w-28">{key}</label>
-                                <input 
-                                    type="range" 
-                                    min="50" max="99" 
-                                    value={value} 
-                                    onChange={e => handleAttributeChange(attrKey, parseInt(e.target.value, 10))}
-                                    className="w-full mx-4"
-                                />
-                                <span className="w-8 text-center font-bold text-cyan-300">{value}</span>
-                            </div>
-                        )
-                    })}
-                </div>
-                 <div className="mt-6 text-right">
-                    <Button onClick={handleSaveChanges} className="!text-center w-auto">Save Changes</Button>
-                </div>
-            </Modal>
-        );
-    };
-
-
-    return (
-        <div>
-            {editingPlayer && <PlayerEditModal player={editingPlayer} onClose={() => setEditingPlayer(null)} />}
-            <Header title="God Mode" onBack={() => setScreen('MAIN_MENU')} />
-            <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-4">
-                <div className="flex gap-2">
-                    <input type="number" value={fundsInput} onChange={e => setFundsInput(e.target.value)} className="w-full p-2 bg-gray-800 border-2 border-gray-600 text-white" />
-                    <button onClick={handleSetFunds} className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 font-press-start text-sm">SET FUNDS</button>
-                </div>
-                <Button onClick={() => setGameState(p => p ? { ...p, forceWinNextGame: !p.forceWinNextGame } : p)} className={`${gameState.forceWinNextGame ? 'text-green-400 border-green-400' : 'text-red-400 border-red-400'}`}>
-                    Force Win Next Game: {gameState.forceWinNextGame ? 'ON' : 'OFF'}
-                </Button>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Button onClick={() => GodModeAction('heal')} className="!text-center border-green-400 text-green-400 hover:bg-green-400">Heal All Injuries</Button>
-                    <Button onClick={() => GodModeAction('morale')} className="!text-center border-blue-400 text-blue-400 hover:bg-blue-400">Max Morale</Button>
-                    <Button onClick={() => GodModeAction('stamina')} className="!text-center border-yellow-400 text-yellow-400 hover:bg-yellow-400">Restore Stamina</Button>
-                </div>
-
-                <h2 className="font-press-start text-xl text-cyan-400 pt-4">Edit Player</h2>
-                <div className="space-y-2 max-h-96 overflow-y-auto p-2 bg-black/20">
-                    {gameState.teams.find(t => t.id === gameState.myTeamId)!.roster.sort((a,b) => b.attributes.OVR - a.attributes.OVR).map(p => (
-                        <div key={p.id} className="p-2 bg-gray-800 flex justify-between items-center">
-                            <span>{p.name} ({p.position}, OVR: {p.attributes.OVR})</span>
-                            <button onClick={() => setEditingPlayer(p)} className="px-2 py-1 text-xs bg-cyan-600 hover:bg-cyan-500">EDIT</button>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const RecruitmentScreen = ({ gameState, setGameState, onFinalizeRecruiting }: { gameState: GameState, setGameState: React.Dispatch<React.SetStateAction<GameState | null>>, onFinalizeRecruiting: (signedRecruits: Recruit[]) => void }) => {
-    const [availableRecruits, setAvailableRecruits] = React.useState(gameState.recruits);
-    const [signedRecruits, setSignedRecruits] = React.useState<Recruit[]>([]);
-    const [recruitingPoints, setRecruitingPoints] = React.useState(gameState.recruitingPoints);
-
-    const handleSignRecruit = (recruit: Recruit) => {
-        if (recruitingPoints >= recruit.cost) {
-            setRecruitingPoints(prev => prev - recruit.cost);
-            setSignedRecruits(prev => [...prev, recruit]);
-            setAvailableRecruits(prev => prev.filter(r => r.id !== recruit.id));
-        }
-    };
-    
-    const RecruitCard: React.FC<{ recruit: Recruit, onSign: (r: Recruit) => void, canAfford: boolean }> = ({ recruit, onSign, canAfford }) => (
-        <div className="p-3 bg-gray-800 border border-gray-700 flex flex-col justify-between">
-            <div>
-                <div className="flex justify-between items-center">
-                    <h3 className="font-bold text-lg">{recruit.name}</h3>
-                    <span className="font-bold text-cyan-400">{recruit.position}</span>
-                </div>
-                <div className="flex justify-between items-center mt-2 text-sm">
-                    <span>OVR: <span className="font-bold">{recruit.attributes.OVR}</span></span>
-                    <span>Potential: <span className="font-bold">{recruit.attributes.Potential}</span></span>
-                </div>
-            </div>
-            <div className="mt-4">
-                 <Button onClick={() => onSign(recruit)} disabled={!canAfford} className="!text-center w-full text-sm">
-                    Sign (Cost: {recruit.cost})
-                </Button>
-            </div>
-        </div>
-    );
-
-    return (
-        <div>
-            <Header title="Offseason Recruiting" />
-            <div className="p-4 md:p-8 max-w-7xl mx-auto">
-                <div className="flex justify-between items-center mb-6 p-4 bg-gray-800/50">
-                    <h2 className="font-press-start text-xl">Recruiting Points: <span className="text-yellow-400">{recruitingPoints}</span></h2>
-                    <Button onClick={() => onFinalizeRecruiting(signedRecruits)} className="!text-center w-auto border-green-400 text-green-400 hover:bg-green-400">
-                        Go To Training Camp
-                    </Button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {availableRecruits.sort((a,b) => b.attributes.OVR - a.attributes.OVR).map(recruit => (
-                        <RecruitCard key={recruit.id} recruit={recruit} onSign={handleSignRecruit} canAfford={recruitingPoints >= recruit.cost}/>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-const TrainingCampScreen = ({ gameState, signedRecruits, onFinishTraining }: { gameState: GameState, signedRecruits: Recruit[], onFinishTraining: (selections: Record<string, TrainingProgram>) => void }) => {
-    const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
-    const [trainingSelections, setTrainingSelections] = React.useState<Record<string, TrainingProgram>>({});
-    
-    const trainingPrograms: Record<TrainingProgram, { name: string, cost: number, positions: Position[] }> = {
-      'NONE': { name: 'No Training', cost: 0, positions: ['QB', 'RB', 'WR', 'TE', 'OL', 'DL', 'LB', 'DB', 'K/P'] },
-      'CONDITIONING': { name: 'Conditioning (STA)', cost: 5000, positions: ['QB', 'RB', 'WR', 'TE', 'OL', 'DL', 'LB', 'DB', 'K/P'] },
-      'STRENGTH': { name: 'Strength (STR, BLK)', cost: 15000, positions: ['RB', 'TE', 'OL', 'DL', 'LB'] },
-      'AGILITY': { name: 'Agility (SPD)', cost: 15000, positions: ['QB', 'RB', 'WR', 'TE', 'LB', 'DB'] },
-      'PASSING': { name: 'Passing (PAS, CON)', cost: 25000, positions: ['QB'] },
-      'RECEIVING': { name: 'Receiving (CAT)', cost: 25000, positions: ['RB', 'WR', 'TE'] },
-      'TACKLING': { name: 'Tackling (TCK)', cost: 25000, positions: ['DL', 'LB', 'DB'] }
-    };
-    
-    const totalCost = Object.values(trainingSelections).reduce((sum, program) => sum + (trainingPrograms[program]?.cost || 0), 0);
-    const canAfford = gameState.funds >= totalCost;
-    
-    const handleSelectionChange = (playerId: string, program: TrainingProgram) => {
-        setTrainingSelections(prev => ({...prev, [playerId]: program}));
-    };
-
-    const combinedRoster = [...myTeam.roster, ...signedRecruits].sort((a, b) => b.attributes.OVR - a.attributes.OVR);
-
-    return (
-        <div>
-            <Header title="Pre-Season Training Camp" />
-            <div className="p-4 md:p-8 max-w-5xl mx-auto">
-                 <div className="flex flex-col md:flex-row justify-between items-center mb-6 p-4 bg-gray-800/50">
-                    <div>
-                        <h2 className="font-press-start text-lg">Available Funds: <span className="text-green-400">${gameState.funds.toLocaleString()}</span></h2>
-                        <h2 className="font-press-start text-lg">Total Cost: <span className={canAfford ? 'text-yellow-400' : 'text-red-500'}>${totalCost.toLocaleString()}</span></h2>
-                    </div>
-                    <Button onClick={() => onFinishTraining(trainingSelections)} disabled={!canAfford} className="!text-center w-full md:w-auto mt-4 md:mt-0 border-green-400 text-green-400 hover:bg-green-400">
-                        Start New Season
-                    </Button>
-                </div>
-                <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
-                    <table className="w-full text-sm">
-                        <thead className="text-left text-gray-400 uppercase sticky top-0 bg-gray-900">
-                            <tr>
-                                <th className="p-2">Player</th>
-                                <th className="p-2">Pos</th>
-                                <th className="p-2">OVR</th>
-                                <th className="p-2 w-1/2">Training Program</th>
+        <ScreenWrapper screenKey="TRAINING_CAMP">
+            <div className="p-4">
+                <h2 className="text-2xl font-press-start text-cyan-400 mb-2">Training Camp</h2>
+                <p className="text-lg text-green-400 mb-4">Funds: ${remainingFunds.toLocaleString()}</p>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="bg-gray-800">
+                                {['Pos', 'Name', 'OVR', 'Training Program'].map(h => <th key={h} className="p-2 uppercase">{h}</th>)}
                             </tr>
                         </thead>
                         <tbody>
-                            {combinedRoster.map(player => (
-                                <tr key={player.id} className="border-b border-gray-700">
-                                    <td className="p-2 font-bold">{player.name} {signedRecruits.some(r => r.id === player.id) ? '(R)' : ''}</td>
-                                    <td className="p-2">{player.position}</td>
-                                    <td className="p-2">{player.attributes.OVR}</td>
+                            {combinedRoster.map(p => (
+                                <tr key={p.id} className="border-b border-gray-700">
+                                    <td className="p-2"><span className={`px-2 py-1 text-xs font-bold rounded ${getPositionColor(p.position)}`}>{p.position}</span></td>
+                                    <td className="p-2">{p.name}</td>
+                                    <td className={`p-2 font-bold ${getAttributeColor(p.attributes.OVR)}`}>{p.attributes.OVR}</td>
                                     <td className="p-2">
                                         <select
-                                            value={trainingSelections[player.id] || 'NONE'}
-                                            onChange={(e) => handleSelectionChange(player.id, e.target.value as TrainingProgram)}
-                                            className="w-full bg-gray-800 border border-gray-600 p-1"
+                                            value={selections[p.id] || 'NONE'}
+                                            onChange={(e) => onSelectProgram(p.id, e.target.value as TrainingProgram)}
+                                            className="bg-gray-700 border border-gray-600 p-1 w-full"
                                         >
-                                            {Object.entries(trainingPrograms).map(([key, program]) => {
-                                                if (program.positions.includes(player.position)) {
-                                                    return <option key={key} value={key}>{program.name} - ${program.cost.toLocaleString()}</option>
-                                                }
-                                                return null;
-                                            })}
+                                            {programs.map(prog => (
+                                                <option key={prog} value={prog} disabled={remainingFunds < programCosts[prog] && selections[p.id] !== prog}>
+                                                    {prog} - ${programCosts[prog].toLocaleString()}
+                                                </option>
+                                            ))}
                                         </select>
                                     </td>
                                 </tr>
@@ -784,547 +688,429 @@ const TrainingCampScreen = ({ gameState, signedRecruits, onFinishTraining }: { g
                         </tbody>
                     </table>
                 </div>
+                <Button onClick={() => onFinish(selections)} className="mt-4" disabled={funds < totalCost}>Finalize & Advance to Season</Button>
             </div>
-        </div>
+        </ScreenWrapper>
     );
 };
 
-const PlayerModal = ({ player, onClose }: { player: Player, onClose: () => void }) => {
-    const statCategories: (keyof PlayerStats)[] = ['gamesPlayed', 'passYds', 'passTDs', 'rushYds', 'rushTDs', 'recYds', 'recTDs', 'tackles', 'sacks', 'ints'];
 
-    const StatRow: React.FC<{ category: string, seasonValue: number, careerValue: number }> = ({ category, seasonValue, careerValue }) => (
-        <tr>
-            <td className="p-1 capitalize text-gray-400">{category.replace('Yds', ' Yds').replace('TDs', ' TDs')}</td>
-            <td className="p-1 text-right font-bold">{seasonValue}</td>
-            <td className="p-1 text-right font-bold text-gray-300">{careerValue}</td>
-        </tr>
+const PlayGameScreen = ({ activeGame, myTeam, opponentTeam, onPlay, onSkip }: { activeGame: ActiveGameState, myTeam: Team, opponentTeam: Team, onPlay: (play: OffensivePlay) => void, onSkip: () => void }) => {
+    const offensivePlays: OffensivePlay[] = ['Inside Run', 'Outside Run', 'Slant', 'Post', 'Screen Pass', 'Play Action'];
+    return (
+        <ScreenWrapper screenKey="PLAY_GAME">
+            <div className="p-4">
+                <div className="grid grid-cols-3 text-center mb-4 bg-black/50 p-2 font-press-start">
+                    <div className="text-cyan-400">{myTeam.name}: {activeGame.playerScore}</div>
+                    <div>Q{activeGame.quarter} - {Math.floor(activeGame.time / 60)}:{String(activeGame.time % 60).padStart(2, '0')}</div>
+                    <div className="text-red-400">{opponentTeam.name}: {activeGame.opponentScore}</div>
+                </div>
+                 <div className="text-center text-lg font-bold mb-4">
+                    {activeGame.possession === 'player' ? 'Your Possession' : 'Opponent Possession'} - {activeGame.down}{['st','nd','rd','th'][activeGame.down-1]} & {activeGame.distance} at the {activeGame.yardLine > 50 ? 100 - activeGame.yardLine : activeGame.yardLine}
+                </div>
+                <div className="h-64 overflow-y-auto bg-gray-800/50 p-2 mb-4 border border-gray-700">
+                    {activeGame.playLog.map((log, i) => <p key={i}>{log}</p>)}
+                </div>
+
+                {activeGame.possession === 'player' ? (
+                     <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {offensivePlays.map(play => <Button key={play} onClick={() => onPlay(play)} className="text-center justify-center">{play}</Button>)}
+                        <Button onClick={() => onPlay('Hail Mary')} className="text-center justify-center border-yellow-500 hover:bg-yellow-500">Hail Mary</Button>
+                     </div>
+                ) : <p className="text-center font-press-start">Waiting for Opponent...</p>}
+                 <Button onClick={onSkip} className="mt-4 text-center justify-center">Sim to End</Button>
+            </div>
+        </ScreenWrapper>
     );
+};
+
+const OffseasonModal = ({ awards, onStartRecruiting }: { awards: SeasonAwards, onStartRecruiting: () => void }) => (
+    <Modal size="4xl">
+        <h2 className="text-2xl font-press-start text-cyan-400 mb-4">Offseason Report</h2>
+        <div className="space-y-4">
+            <h3 className="text-xl font-press-start text-yellow-400">Season Awards</h3>
+            {awards.mvp && <p>MVP: {awards.mvp.name} ({awards.mvp.position})</p>}
+            <p>Best QB: {awards.bestQB?.name || 'N/A'}</p>
+             <p>Best RB: {awards.bestRB?.name || 'N/A'}</p>
+             <p>Best WR: {awards.bestWR?.name || 'N/A'}</p>
+             {/* ... more awards */}
+        </div>
+        <Button onClick={onStartRecruiting} className="mt-6">Start Recruiting</Button>
+    </Modal>
+);
+
+const GameResultModal = ({ result, myTeamName, opponentName, onContinue }: { result: Game['result'], myTeamName: string, opponentName: string, onContinue: () => void }) => {
+    if (!result) return null;
+    const didWin = result.myScore > result.opponentScore;
+    
+    const findTopPerformer = (stats: Record<string, Partial<PlayerStats>>) => {
+        let topPlayer: Player | null = null;
+        let topStat = 0;
+        for (const playerId in stats) {
+            const pStats = stats[playerId];
+            const score = (pStats.passYds || 0) / 10 + (pStats.rushYds || 0) / 5 + (pStats.recYds || 0) / 5 + (pStats.passTDs || 0) * 6 + (pStats.rushTDs || 0) * 6 + (pStats.recTDs || 0) * 6;
+            if (score > topStat) {
+                topStat = score;
+                // This part requires access to the roster to get player names.
+                // For now, we'll just show stats. A better implementation would pass the rosters in.
+            }
+        }
+        return "Top Performer Stats here..."; // Placeholder
+    };
 
     return (
-        <Modal onClose={onClose}>
-            <div className="flex justify-between items-start">
-                <div>
-                    <h2 className="text-2xl font-press-start text-cyan-400">{player.name}</h2>
-                    <p className="text-lg text-gray-300">{player.position} | {player.year} | OVR: {player.attributes.OVR}</p>
-                </div>
-                <button onClick={onClose} className="text-2xl text-gray-500 hover:text-white">&times;</button>
-            </div>
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div>
-                    <h3 className="font-press-start text-lg text-cyan-400 mb-2">Attributes</h3>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                        <div className="flex justify-between items-center"><span>Stamina:</span> <StatBar value={player.currentStamina} /></div>
-                        {Object.entries(player.attributes).map(([key, value]) => (
-                            <div key={key} className="flex justify-between items-center">
-                                <span>{key}:</span>
-                                <StatBar value={value} max={99} />
-                            </div>
-                        ))}
-                    </div>
-                </div>
-                 <div>
-                    <h3 className="font-press-start text-lg text-cyan-400 mb-2">Stats</h3>
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="text-left text-gray-500">
-                                <th className="p-1">Stat</th>
-                                <th className="p-1 text-right">Season</th>
-                                <th className="p-1 text-right">Career</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {statCategories.map(key => {
-                                const seasonValue = player.seasonStats[key];
-                                const careerValue = player.careerStats[key];
-                                if (seasonValue > 0 || careerValue > 0) {
-                                    return <StatRow key={key} category={key} seasonValue={seasonValue} careerValue={careerValue} />;
-                                }
-                                return null;
-                            })}
-                        </tbody>
-                    </table>
-                 </div>
-            </div>
+        <Modal size="2xl">
+            <h2 className={`text-3xl font-press-start text-center mb-4 ${didWin ? 'text-green-400' : 'text-red-400'}`}>
+                {didWin ? 'VICTORY' : 'DEFEAT'}
+            </h2>
+            <p className="text-center text-4xl mb-6">{result.myScore} - {result.opponentScore}</p>
+            <Button onClick={onContinue} className="text-center justify-center">Continue</Button>
         </Modal>
     );
 };
 
-
-const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+const GameOverScreen = ({ season, onRestart }: { season: number, onRestart: () => void }) => (
+    <ScreenWrapper screenKey="GAME_OVER">
+         <div className="p-8 text-center">
+            <h2 className="text-4xl font-press-start text-red-500 mb-4">CAREER OVER</h2>
+            <p className="text-xl mb-6">You coached for {season - 1} seasons.</p>
+            <Button onClick={onRestart} className="text-center justify-center">Start New Career</Button>
+        </div>
+    </ScreenWrapper>
+);
 
 // --- MAIN APP COMPONENT ---
 
 const App = () => {
-  const [gameState, setGameState] = React.useState<GameState | null>(null);
-  const [currentScreen, setScreen] = React.useState<Screen>('TEAM_SELECTION');
-  const [loadingText, setLoadingText] = React.useState<string>('');
-  const [selectedPlayer, setSelectedPlayer] = React.useState<Player | null>(null);
-  const [godModeUnlocked, setGodModeUnlocked] = React.useState(false);
-  const [showGodModePassword, setShowGodModePassword] = React.useState(false);
-  const [showPreGameModal, setShowPreGameModal] = React.useState(false);
-  const [showGameResultModal, setShowGameResultModal] = React.useState<{ result: NonNullable<Game['result']>, isRivalry: boolean } | null>(null);
-  const [offseasonSignedRecruits, setOffseasonSignedRecruits] = React.useState<Recruit[]>([]);
+    const [gameState, setGameState] = React.useState<GameState | null>(null);
+    const [screen, setScreen] = React.useState<Screen>('TEAM_SELECTION');
+    const [loading, setLoading] = React.useState<string | null>(null);
+    const [selectedPlayer, setSelectedPlayer] = React.useState<Player | null>(null);
+    const [modal, setModal] = React.useState<{type: 'gameSummary' | 'scoutingReport', game: Game, opponent: Team} | null>(null);
+    const [signedRecruits, setSignedRecruits] = React.useState<Recruit[]>([]);
+    const [trainingSelections, setTrainingSelections] = React.useState<Record<string, TrainingProgram>>({});
 
-
-  const handleTeamSelection = (teamId: number) => {
-    setLoadingText("Building your dynasty...");
-    setTimeout(() => {
-      const initialState = GameService.initializeGameWorld();
-      setGameState({ ...initialState, myTeamId: teamId });
-      setScreen('MAIN_MENU');
-      setLoadingText('');
-    }, 500);
-  };
-    
-  const handleSimulateGame = () => {
-    setShowPreGameModal(false);
-    setLoadingText("Simulating Week...");
-    setTimeout(() => {
-        setGameState(currentGameState => {
-            if (!currentGameState) return null;
-
-            let updatedState = { ...currentGameState, teams: JSON.parse(JSON.stringify(currentGameState.teams)), schedule: JSON.parse(JSON.stringify(currentGameState.schedule))};
-            
-            const myTeam = updatedState.teams.find(t => t.id === updatedState.myTeamId)!;
-            const opponentId = GameService.findNextOpponentId(updatedState);
-            if (!opponentId) {
-                console.error("No opponent found");
-                return updatedState;
-            }
-            const opponent = updatedState.teams.find(t => t.id === opponentId)!;
-            const game = updatedState.schedule[myTeam.id].find(g => g.week === updatedState.week && g.opponentId === opponentId) || { week: updatedState.week, opponentId: opponent.id, isHome: true, weather: 'Sunny' };
-
-            const myGameResult = GameService.simulateGame(myTeam, opponent, updatedState.myStrategy, {offense: 'Balanced', defense: '4-3 Defense'}, updatedState.facilities, {level: 1, cost: 0}, game.weather || 'Sunny', updatedState.forceWinNextGame);
-            
-            GameService.applyGameResults(myTeam, opponent, myGameResult, updatedState.schedule);
-            updatedState.lastGameResult = myGameResult.result;
-
-            GameService.simulateOtherGames(updatedState);
-
-            // Handle rivalry bonus
-            if (game.isRivalryGame && myGameResult.didWin) {
-                updatedState.funds += 25000;
-                updatedState.fanHappiness = Math.min(100, updatedState.fanHappiness + 10);
-            }
-            
-            if (updatedState.week < 13) updatedState.week++;
-            
-            myTeam.roster.forEach(p => {
-                const recoveryRate = 10 + (updatedState.facilities.training.level * 3);
-                p.currentStamina = Math.min(100, p.currentStamina + recoveryRate);
-            });
-            
-            updatedState.nationalRankings = GameService.updateRankings(updatedState.teams);
-            
-            if (updatedState.week > 10) {
-                 const isEliminated = GameService.updatePlayoffBracket(updatedState, myTeam.id, opponent.id, myGameResult.didWin);
-                 if (isEliminated) {
-                     updatedState = GameService.startOffseason(updatedState);
-                 } else if (updatedState.week === 14) {
-                     updatedState.trophyCase.push({ season: updatedState.season, award: 'National Champions' });
-                     updatedState = GameService.startOffseason(updatedState);
-                 }
-            }
-            if (updatedState.week > 10 && !updatedState.playoffBracket) {
-                 updatedState = GameService.startOffseason(updatedState);
-            }
-            setShowGameResultModal({ result: updatedState.lastGameResult, isRivalry: !!game.isRivalryGame });
-            return { ...updatedState, forceWinNextGame: false };
-        });
-        setLoadingText('');
-    }, 1000);
-  };
-    
-  const handleStartRecruitment = () => {
-    setScreen('RECRUITMENT');
-  }
-
-  const handleFinalizeRecruiting = (signedRecruits: Recruit[]) => {
-    setOffseasonSignedRecruits(signedRecruits);
-    setScreen('TRAINING_CAMP');
-  }
-
-  const handleFinishTraining = (trainingSelections: Record<string, TrainingProgram>) => {
-    setLoadingText("Advancing to next season...");
-    setTimeout(() => {
-        setGameState(prev => {
-            if (!prev) return null;
-            const { updatedState, updatedRecruits } = GameService.applyTrainingCampResults(prev, trainingSelections, offseasonSignedRecruits);
-            return GameService.advanceToNextSeason(updatedState, updatedRecruits);
-        });
-        setOffseasonSignedRecruits([]);
-        setScreen('MAIN_MENU');
-        setLoadingText('');
-    }, 1000);
-  };
-
-  const handleStartPlayableGame = () => {
-    setShowPreGameModal(false);
-    setGameState(prev => {
-        if (!prev) return prev;
-
-        const myTeam = prev.teams.find(t => t.id === prev.myTeamId)!;
-        const opponentId = GameService.findNextOpponentId(prev);
-        if (!opponentId) return prev;
-
-        const newActiveGame: ActiveGameState = {
-            quarter: 1,
-            time: 15 * 60,
-            down: 1,
-            distance: 10,
-            yardLine: 25,
-            possession: 'player',
-            playerScore: 0,
-            opponentScore: 0,
-            gameId: `${prev.season}-${prev.week}-${myTeam.id}-${opponentId}`,
-            opponentId: opponentId,
-            playLog: ['The game is underway!'],
-            isGameOver: false,
-        };
-        return { ...prev, activeGame: newActiveGame };
-    });
-    setScreen('PLAY_GAME');
-  };
-
-  const handleFinishPlayableGame = (stats: Record<string, Partial<PlayerStats>>) => {
-    if (!gameState || !gameState.activeGame) return;
-    setLoadingText("Finalizing game results...");
-    setTimeout(() => {
-        const game = gameState.schedule[gameState.myTeamId!].find(g => g.week === gameState.week);
-        
-        let finalState = GameService.applyPlayableGameResults(gameState, gameState.activeGame, stats);
-        
-        // Handle rivalry bonus
-        if (game?.isRivalryGame && finalState.lastGameResult && finalState.lastGameResult.myScore > finalState.lastGameResult.opponentScore) {
-            finalState.funds += 25000;
-            finalState.fanHappiness = Math.min(100, finalState.fanHappiness + 10);
+    React.useEffect(() => {
+        const savedState = localStorage.getItem('footballGameState');
+        if (savedState) {
+            setGameState(JSON.parse(savedState));
+            setScreen('MAIN_MENU');
         }
-        
-        setGameState(finalState);
-        if (finalState.lastGameResult) {
-            setShowGameResultModal({ result: finalState.lastGameResult, isRivalry: !!game?.isRivalryGame });
+    }, []);
+
+    React.useEffect(() => {
+        if (gameState) {
+            localStorage.setItem('footballGameState', JSON.stringify(gameState));
         }
-        setScreen('MAIN_MENU');
-        setLoadingText('');
-    }, 1000);
-  };
+    }, [gameState]);
 
-
-  const handleGodModePassword = (password: string) => {
-    if (password === '102011') {
-        setGodModeUnlocked(true);
-        setScreen('GOD_MODE');
-    }
-    setShowGodModePassword(false);
-  };
-
-  const renderScreen = (): React.ReactElement => {
-    if (!gameState) {
-      return <ScreenWrapper screenKey="TEAM_SELECTION" children={<TeamSelectionScreen onTeamSelect={handleTeamSelection} />} />;
-    }
-
-    switch(currentScreen) {
-      case 'MAIN_MENU':
-        return <ScreenWrapper screenKey={currentScreen} children={<MainMenu gameState={gameState} setScreen={setScreen} onPlayNextGame={() => setShowPreGameModal(true)} onStartRecruitment={handleStartRecruitment} onGodModeClick={() => godModeUnlocked ? setScreen('GOD_MODE') : setShowGodModePassword(true)} />} />;
-      case 'ROSTER':
-        return <ScreenWrapper screenKey={currentScreen} children={<RosterScreen gameState={gameState} setScreen={setScreen} onPlayerSelected={setSelectedPlayer} />} />;
-      case 'SCHEDULE':
-          return <ScreenWrapper screenKey={currentScreen} children={<ScheduleScreen gameState={gameState} setScreen={setScreen} onGameSelected={() => {}} />} />;
-      case 'STANDINGS':
-          return <ScreenWrapper screenKey={currentScreen} children={<StandingsScreen gameState={gameState} setScreen={setScreen} />} />;
-      case 'FACILITIES':
-          return <ScreenWrapper screenKey={currentScreen} children={<FacilitiesScreen gameState={gameState} setGameState={setGameState} setScreen={setScreen} />} />;
-      case 'AWARDS':
-          return <ScreenWrapper screenKey={currentScreen} children={<AwardsScreen gameState={gameState} setScreen={setScreen} />} />;
-      case 'GOD_MODE':
-          return <ScreenWrapper screenKey={currentScreen} children={<GodModeScreen gameState={gameState} setGameState={setGameState} setScreen={setScreen} />} />;
-      case 'NATIONAL_STATS':
-          return <ScreenWrapper screenKey={currentScreen} children={<NationalStatsScreen gameState={gameState} setScreen={setScreen} onPlayerSelected={setSelectedPlayer} />} />;
-      case 'TROPHY_CASE':
-          return <ScreenWrapper screenKey={currentScreen} children={<TrophyCaseScreen gameState={gameState} setScreen={setScreen} />} />;
-      case 'TACTICS':
-          return <ScreenWrapper screenKey={currentScreen} children={<TacticsScreen gameState={gameState} setGameState={setGameState} setScreen={setScreen} />} />;
-      case 'PLAY_GAME':
-          return <ScreenWrapper screenKey={currentScreen} children={<GameplayScreen gameState={gameState} setGameState={setGameState} onGameEnd={handleFinishPlayableGame} />} />;
-      case 'RECRUITMENT':
-          return <ScreenWrapper screenKey={currentScreen} children={<RecruitmentScreen gameState={gameState} setGameState={setGameState} onFinalizeRecruiting={handleFinalizeRecruiting} />} />;
-      case 'TRAINING_CAMP':
-          return <ScreenWrapper screenKey={currentScreen} children={<TrainingCampScreen gameState={gameState} signedRecruits={offseasonSignedRecruits} onFinishTraining={handleFinishTraining} />} />;
-      default:
-        return <ScreenWrapper screenKey="MAIN_MENU" children={<MainMenu gameState={gameState} setScreen={setScreen} onPlayNextGame={() => setShowPreGameModal(true)} onStartRecruitment={handleStartRecruitment} onGodModeClick={() => godModeUnlocked ? setScreen('GOD_MODE') : setShowGodModePassword(true)} />} />;
-    }
-  };
-  
-  const GameplayScreen = ({ gameState, setGameState, onGameEnd }: { gameState: GameState, setGameState: React.Dispatch<React.SetStateAction<GameState | null>>, onGameEnd: (stats: Record<string, Partial<PlayerStats>>) => void }) => {
-      const { activeGame, myStrategy } = gameState;
-      const [gameStats, setGameStats] = React.useState<Record<string, Partial<PlayerStats>>>({});
-      
-      React.useEffect(() => {
-          if (activeGame && activeGame.isGameOver) {
-              onGameEnd(gameStats);
-          }
-      }, [activeGame, onGameEnd, gameStats]);
-
-      if (!activeGame) return null;
-
-      const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
-      const opponent = gameState.teams.find(t => t.id === activeGame.opponentId)!;
-      const game = gameState.schedule[myTeam.id]?.find(g => g.week === gameState.week);
-      
-      const { playerScore, opponentScore } = activeGame;
-
-      const formatTime = (seconds: number) => {
-          const min = Math.floor(seconds / 60);
-          const sec = seconds % 60;
-          return `${min}:${sec < 10 ? '0' : ''}${sec}`;
-      };
-      
-      const playbookPlays: Record<OffensivePlaybook, OffensivePlay[]> = {
-          'Balanced': ['Inside Run', 'Outside Run', 'Slant', 'Screen Pass', 'Post'],
-          'Air Raid': ['Slant', 'Post', 'Screen Pass', 'Play Action', 'Hail Mary'],
-          'Run Heavy': ['Inside Run', 'Outside Run', 'Power Run', 'Draw Play', 'Play Action'],
-          'Spread': ['Outside Run', 'Draw Play', 'Slant', 'Screen Pass', 'Post'],
-          'Pro-Style': ['Inside Run', 'Play Action', 'Power Run', 'Post', 'Slant']
-      };
-
-      const handlePlayCall = (playType: OffensivePlay) => {
-        setGameState(prev => {
-            if (!prev || !prev.activeGame) return prev;
-            
-            const outcome = GameService.simulatePlay(myTeam, opponent, playType, prev.activeGame.yardLine);
-            setGameStats(prevStats => {
-                const newStats = JSON.parse(JSON.stringify(prevStats));
-                outcome.statEvents.forEach(event => {
-                    if (!newStats[event.playerId]) newStats[event.playerId] = {};
-                    const stat = event.stat as keyof PlayerStats;
-                    newStats[event.playerId][stat] = (newStats[event.playerId][stat] || 0) + event.value;
-                });
-                return newStats;
-            });
-
-            const { yardLine: currentYardLine, down: currentDown, distance: currentDistance, possession: currentPossession, playerScore: currentPlayerScore, opponentScore: currentOpponentScore, time: currentTime, quarter: currentQuarter, playLog: currentPlayLog, isGameOver: currentIsGameOver } = prev.activeGame;
-
-            let yardLine = currentYardLine, down = currentDown, distance = currentDistance, possession = currentPossession, playerScore = currentPlayerScore, opponentScore = currentOpponentScore, time = currentTime, quarter = currentQuarter, playLog = currentPlayLog, isGameOver = currentIsGameOver;
-
-            time -= rand(25, 45);
-            playLog = [...playLog, outcome.description].slice(-5);
-
-            if (outcome.isTurnover) {
-                possession = 'opponent';
-                yardLine = 100 - (yardLine + outcome.yards);
-                down = 1; distance = 10;
-            } else if (!outcome.isComplete) {
-                down++;
-            } else {
-                yardLine += outcome.yards;
-                distance -= outcome.yards;
-                if (yardLine >= 100) { // Touchdown
-                    playerScore += 7;
-                    playLog.push("TOUCHDOWN!");
-                    possession = 'opponent'; yardLine = 25; down = 1; distance = 10;
-                } else if (distance <= 0) { // First down
-                    down = 1; distance = 10;
-                } else {
-                    down++;
-                }
-            }
-
-            if (down > 4) { // Turnover on downs
-                possession = 'opponent'; yardLine = 100 - yardLine; down = 1; distance = 10;
-                playLog.push("Turnover on downs!");
-            }
-            
-            if (time <= 0) {
-                quarter++;
-                time = 15 * 60;
-                if (quarter > 4) {
-                    isGameOver = true;
-                }
-            }
-
-            return { ...prev, activeGame: { ...prev.activeGame, yardLine, down, distance, possession, playerScore, opponentScore, time, quarter, playLog, isGameOver } };
-        });
-      };
-      
-      const handleSimulateOpponentDrive = () => {
-        setGameState(prev => {
-            if (!prev || !prev.activeGame) return prev;
-            const driveResult = GameService.simulateOpponentDrive(myTeam, opponent);
-            
-            const { opponentScore: currentOpponentScore, time: currentTime, quarter: currentQuarter, playLog: currentPlayLog, isGameOver: currentIsGameOver } = prev.activeGame;
-            
-            let opponentScore = currentOpponentScore, time = currentTime, quarter = currentQuarter, playLog = currentPlayLog, isGameOver = currentIsGameOver;
-
-            opponentScore += driveResult.score;
-            time -= driveResult.timeElapsed;
-            playLog = [...playLog, driveResult.description].slice(-5);
-            
-            if (time <= 0) {
-                quarter++;
-                time = 15 * 60;
-                if (quarter > 4) {
-                    isGameOver = true;
-                }
-            }
-
-            return { ...prev, activeGame: { ...prev.activeGame, opponentScore, time, quarter, playLog, isGameOver, possession: 'player', down: 1, distance: 10, yardLine: 25 }};
-        });
-      };
-
-      const handleSkipGame = () => {
-        setGameState(prev => {
-            if (!prev || !prev.activeGame) return prev;
-            const finalState = GameService.skipGameSimulation(prev);
-            return { ...prev, activeGame: finalState };
-        });
-      };
-      
-      return (
-        <div className="p-4 md:p-8">
-            <div className="flex justify-between items-center bg-black/50 p-2 border-2 border-gray-600 mb-4 font-press-start text-sm md:text-lg">
-                <div className="text-left w-1/3"><p>{game?.isHome ? myTeam.name : opponent.name}</p><p className="text-2xl md:text-4xl text-cyan-400">{game?.isHome ? playerScore : opponentScore}</p></div>
-                <div className="text-center w-1/3"><p>Q{activeGame.quarter}</p><p className="text-xl md:text-2xl text-yellow-400">{formatTime(activeGame.time)}</p></div>
-                <div className="text-right w-1/3"><p>{game?.isHome ? opponent.name : myTeam.name}</p><p className="text-2xl md:text-4xl text-cyan-400">{game?.isHome ? opponentScore : playerScore}</p></div>
-            </div>
-
-            <div className="bg-green-800/20 border-y-4 border-white h-48 mb-4 flex items-center justify-center text-center relative overflow-hidden">
-                {[...Array(9)].map((_, i) => <div key={i} className="h-full w-px bg-white/30 absolute" style={{left: `${(i+1)*10}%`}}></div>)}
-                <div className="h-full w-2 bg-white/50 absolute left-1/2 -translate-x-1/2"></div>
-                <div className="absolute top-2 left-2 text-white font-mono z-10 bg-black/30 p-1 rounded"><p>{activeGame.down}{['st','nd','rd','th'][activeGame.down - 1] || 'th'} & {activeGame.distance <= 0 ? 'Goal' : activeGame.distance}</p><p>Ball on the {activeGame.yardLine > 50 ? `Opponent ${100 - activeGame.yardLine}` : `Own ${activeGame.yardLine}`}</p></div>
-                <div className="absolute w-2 h-4 bg-yellow-900 border border-black z-10" style={{ left: `calc(${activeGame.yardLine}% - 4px)` }}></div>
-                <div className="bg-black/70 p-2 text-yellow-300 font-mono text-sm max-w-lg z-10">{activeGame.playLog[activeGame.playLog.length - 1]}</div>
-            </div>
-
-            {activeGame.possession === 'player' ? (
-                <div>
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        {playbookPlays[myStrategy.offense].map(play => (
-                           <Button key={play} onClick={() => handlePlayCall(play)} className="!text-center">{play}</Button>
-                        ))}
-                    </div>
-                    <div className="mt-6">
-                        <Button onClick={handleSkipGame} className="!text-center border-yellow-400 text-yellow-400 hover:bg-yellow-400">Skip Game</Button>
-                    </div>
-                </div>
-            ) : (
-                <div><h3 className="text-center text-xl text-red-400 font-press-start mb-4">Opponent's Possession</h3><Button onClick={handleSimulateOpponentDrive} className="!text-center">Continue</Button></div>
-            )}
-        </div>
-      );
-  };
-  
-  const PreGameModal = () => {
-    if (!gameState) return null;
-    const opponentId = GameService.findNextOpponentId(gameState);
-    if (!opponentId) return null;
-    const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
-    const opponent = gameState.teams.find(t => t.id === opponentId)!;
-
-    return (
-        <Modal onClose={() => setShowPreGameModal(false)} size="2xl">
-            <h2 className="font-press-start text-2xl text-cyan-400 mb-4 text-center">Week {gameState.week} Matchup</h2>
-            <div className="text-center text-xl mb-6">
-                <p>{myTeam.name} ({myTeam.record.wins}-{myTeam.record.losses})</p>
-                <p className="font-press-start text-sm my-2">VS</p>
-                <p>{opponent.name} ({opponent.record.wins}-{opponent.record.losses})</p>
-            </div>
-            <div className="flex flex-col md:flex-row gap-4">
-                <Button onClick={handleStartPlayableGame} className="!text-center flex-1"><span className="flex items-center justify-center"><FootballIcon className="w-5 h-5 mr-3" /> Play Game</span></Button>
-                <Button onClick={handleSimulateGame} className="!text-center flex-1">Simulate Game</Button>
-            </div>
-        </Modal>
-    );
-  }
-
-  const GodModePasswordModal = () => {
-    const [password, setPassword] = React.useState('');
-    return (
-        <Modal onClose={() => setShowGodModePassword(false)} size="xl">
-            <h2 className="font-press-start text-xl text-yellow-400 mb-4">Enter God Mode</h2>
-            <p className="mb-4">Enter the password to unlock God Mode.</p>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2 bg-gray-800 border-2 border-gray-600 text-white mb-4" />
-            <Button onClick={() => handleGodModePassword(password)} className="!text-center">Unlock</Button>
-        </Modal>
-    );
-  };
-
-  const GameResultModal = ({ modalData, teams, myTeamId, onClose, onPlayerSelected }: { modalData: { result: NonNullable<Game['result']>, isRivalry: boolean }, teams: Team[], myTeamId: number, onClose: () => void, onPlayerSelected: (p: Player) => void }) => {
-    const { result, isRivalry } = modalData;
-    const myTeam = teams.find(t => t.id === myTeamId)!;
-    const opponent = teams.find(t => t.id === result.opponentId)!;
-    const didWin = result.myScore > result.opponentScore;
-
-    const findTopPerformer = (team: Team, teamStats: Record<string, Partial<PlayerStats>>, stat: keyof PlayerStats) => {
-// FIX: Cast stat values to number to fix type inference issues.
-        const topPlayerId = Object.keys(teamStats).sort((a, b) => ((teamStats[b][stat] as number) || 0) - ((teamStats[a][stat] as number) || 0))[0];
-        if (!topPlayerId) return null;
-        const player = team.roster.find(p => p.id === topPlayerId);
-        return { player, value: teamStats[topPlayerId][stat] };
+    const handleSelectTeam = (teamId: number) => {
+        setLoading("Building your dynasty...");
+        setTimeout(() => {
+            const initialState = GameService.initializeGameWorld();
+            setGameState({ ...initialState, myTeamId: teamId });
+            setScreen('MAIN_MENU');
+            setLoading(null);
+        }, 500);
     };
 
-    const myTopPasser = findTopPerformer(myTeam, result.playerStats.myTeam, 'passYds');
-    const myTopRusher = findTopPerformer(myTeam, result.playerStats.myTeam, 'rushYds');
-    const myTopReceiver = findTopPerformer(myTeam, result.playerStats.myTeam, 'recYds');
+    const handleAdvanceWeek = () => {
+        if (!gameState || !gameState.myTeamId) return;
+        setLoading("Simulating week...");
 
-    const oppTopPasser = findTopPerformer(opponent, result.playerStats.opponentTeam, 'passYds');
-    const oppTopRusher = findTopPerformer(opponent, result.playerStats.opponentTeam, 'rushYds');
-    const oppTopReceiver = findTopPerformer(opponent, result.playerStats.opponentTeam, 'recYds');
+        setTimeout(() => {
+            let updatedState = JSON.parse(JSON.stringify(gameState));
+            const myTeam = updatedState.teams.find((t: Team) => t.id === updatedState.myTeamId)!;
+
+            // Restore stamina for my team
+            myTeam.roster.forEach((p: Player) => {
+                const trainer = updatedState.staff.find((s: Staff) => s.type === 'Trainer');
+                const recoveryRate = 70 + (trainer ? trainer.rating / 10 : 0);
+                // FIX: Use exported 'rand' function from GameService to resolve 'rand is not defined' error.
+                p.currentStamina = Math.min(100, p.currentStamina + GameService.rand(recoveryRate-10, recoveryRate+10));
+                if (p.isInjured > 0) p.isInjured--;
+            });
+
+            const nextGame = updatedState.schedule[myTeam.id].find((g: Game) => g.week === updatedState.week);
+            
+            if (!nextGame) { // End of regular season
+                const isPlayoffTeam = updatedState.nationalRankings.slice(0, 8).some((t: { teamId: number }) => t.teamId === myTeam.id);
+                if (!isPlayoffTeam) {
+                    updatedState = GameService.startOffseason(updatedState);
+                } else {
+                    updatedState.week++; // Move to playoffs
+                }
+            } else {
+                const opponent = updatedState.teams.find((t: Team) => t.id === nextGame.opponentId)!;
+                const gameResult = GameService.simulateGame(myTeam, opponent, updatedState.myStrategy, {offense: 'Balanced', defense: '4-3 Defense'}, updatedState.facilities, {level: 1, cost: 0}, nextGame.weather || 'Sunny', updatedState.forceWinNextGame, updatedState.staff);
+                
+                GameService.applyGameResults(updatedState, myTeam, opponent, gameResult);
+                
+                if (updatedState.week < 13) {
+                     updatedState.week++;
+                }
+               
+                updatedState = GameService.simulateOtherGames(updatedState);
+                updatedState.nationalRankings = GameService.updateRankings(updatedState.teams);
+
+                if (updatedState.week > 10) {
+                     const isEliminated = GameService.updatePlayoffBracket(updatedState, myTeam.id, opponent.id, gameResult.didWin);
+                     if(isEliminated) {
+                         updatedState = GameService.startOffseason(updatedState);
+                     } else if (updatedState.week === 14) { // Won championship
+                         updatedState.trophyCase.push({ season: updatedState.season, award: 'National Champions' });
+                         updatedState = GameService.startOffseason(updatedState);
+                     }
+                }
+            }
+            
+            // Add new inbox messages
+            const newMessages = GameService.generateWeeklyInbox(updatedState);
+            updatedState.inbox.push(...newMessages);
+            if (updatedState.forceWinNextGame) updatedState.forceWinNextGame = false;
+
+            setGameState(updatedState);
+            setLoading(null);
+        }, 500);
+    };
+
+    const handlePlayGame = (game: Game, opponent: Team) => {
+         if (!gameState) return;
+         setGameState({ ...gameState, activeGame: {
+            quarter: 1, time: 900, down: 1, distance: 10, yardLine: 25, possession: 'player',
+            playerScore: 0, opponentScore: 0, gameId: `${game.week}-${game.opponentId}`, opponentId: opponent.id, playLog: ["Game Start!"], isGameOver: false
+         }});
+         setScreen('PLAY_GAME');
+    };
     
-    const PerfStat = ({ title, data }: {title: string, data: {player: Player | undefined, value: number | undefined} | null}) => {
-        if (!data?.player || !data.value) return null;
-        return (
-            <div className="text-sm">
-                <p className="uppercase text-gray-400">{title}</p>
-                <p><a href="#" onClick={(e) => { e.preventDefault(); onPlayerSelected(data.player!)}} className="font-bold hover:text-cyan-300">{data.player.name}</a>: {data.value} yds</p>
-            </div>
-        );
-    }
+    const handleGameModalClick = (game: Game, opponent: Team) => {
+        if(game.result) {
+            setModal({type: 'gameSummary', game, opponent});
+        } else {
+            setModal({type: 'scoutingReport', game, opponent});
+        }
+    };
+    
+    const handlePlayAction = (play: OffensivePlay) => {
+        if (!gameState?.activeGame || !gameState.myTeamId) return;
+        let activeGame = { ...gameState.activeGame };
+        const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
+        const opponent = gameState.teams.find(t => t.id === activeGame.opponentId)!;
+
+        // Player's Turn
+        const outcome = GameService.simulatePlay(myTeam, opponent, play, activeGame.yardLine, gameState.staff);
+        activeGame.playLog = [outcome.description, ...activeGame.playLog];
+        // FIX: Use exported 'rand' function from GameService to resolve 'rand is not defined' error.
+        activeGame.time -= GameService.rand(25, 40);
+
+        if (outcome.isTouchdown) {
+            activeGame.playerScore += 7;
+            activeGame.possession = 'opponent';
+            activeGame.yardLine = 25;
+            activeGame.down = 1;
+            activeGame.distance = 10;
+        } else if (outcome.isTurnover) {
+            activeGame.possession = 'opponent';
+            activeGame.yardLine = 100 - (activeGame.yardLine + outcome.yards);
+        } else if (!outcome.isComplete) {
+            activeGame.down += 1;
+        } else {
+            activeGame.yardLine += outcome.yards;
+            activeGame.distance -= outcome.yards;
+        }
+
+        if (activeGame.distance <= 0) {
+            activeGame.down = 1;
+            activeGame.distance = 10;
+        }
+        if (activeGame.down > 4) {
+            activeGame.possession = 'opponent';
+            activeGame.yardLine = 100 - activeGame.yardLine;
+            activeGame.down = 1;
+            activeGame.distance = 10;
+        }
+
+        // Opponent's Turn
+        const oppDrive = GameService.simulateOpponentDrive(myTeam, opponent);
+        activeGame.opponentScore += oppDrive.score;
+        activeGame.time -= oppDrive.timeElapsed;
+        activeGame.playLog = [oppDrive.description, ...activeGame.playLog];
+        activeGame.possession = 'player';
+        activeGame.yardLine = 25;
+        activeGame.down = 1;
+        activeGame.distance = 10;
+        
+        if(activeGame.time <= 0 && activeGame.quarter < 4) {
+            activeGame.quarter++;
+            activeGame.time = 900;
+        }
+        
+        if (activeGame.quarter > 4 || (activeGame.quarter === 4 && activeGame.time <= 0)) {
+            activeGame.isGameOver = true;
+        }
+
+
+        setGameState({...gameState, activeGame});
+    };
+    
+    const handleSkipGame = () => {
+         if (!gameState?.activeGame) return;
+         const finalState = GameService.skipGameSimulation(gameState);
+         setGameState({...gameState, activeGame: finalState});
+    };
+
+    const handleFinishPlayableGame = () => {
+        if (!gameState?.activeGame) return;
+        const finalStats: Record<string, Partial<PlayerStats>> = {}; // Simplified for now
+        const newState = GameService.applyPlayableGameResults(gameState, gameState.activeGame, finalStats);
+        setGameState(newState);
+        setScreen('MAIN_MENU');
+    };
+
+    const handleUpgradeFacility = (facility: keyof GameState['facilities']) => {
+        if (!gameState) return;
+        const cost = gameState.facilities[facility].cost;
+        if (gameState.funds >= cost) {
+            const newState = JSON.parse(JSON.stringify(gameState));
+            newState.funds -= cost;
+            newState.facilities[facility].level++;
+            newState.facilities[facility].cost = Math.floor(cost * 1.75);
+            setGameState(newState);
+        }
+    };
+    
+    const handleSignRecruit = (recruit: Recruit) => {
+        if (!gameState || gameState.recruitingPoints < recruit.cost || signedRecruits.some(r => r.id === recruit.id)) return;
+        setGameState({ ...gameState, recruitingPoints: gameState.recruitingPoints - recruit.cost });
+        setSignedRecruits([...signedRecruits, recruit]);
+    };
+    
+    const handleFinishRecruiting = () => {
+        setScreen('TRAINING_CAMP');
+    };
+
+    const handleTrainingSelection = (playerId: string, program: TrainingProgram) => {
+        setTrainingSelections({...trainingSelections, [playerId]: program });
+    };
+
+    const handleFinishTraining = () => {
+        if (!gameState) return;
+        setLoading("Applying training...");
+        setTimeout(() => {
+            const { updatedState } = GameService.applyTrainingCampResults(gameState, trainingSelections, signedRecruits);
+            const finalState = GameService.advanceToNextSeason(updatedState, signedRecruits);
+            setGameState(finalState);
+            setSignedRecruits([]);
+            setTrainingSelections({});
+            setScreen('MAIN_MENU');
+            setLoading(null);
+        }, 500);
+    };
+
+    const handleHireStaff = (staffId: string) => {
+        if (!gameState) return;
+        const newState = GameService.hireStaff(JSON.parse(JSON.stringify(gameState)), staffId);
+        setGameState(newState);
+    };
+
+    const handleSelectSponsor = (sponsorId: string) => {
+        if (!gameState || gameState.activeSponsor) return;
+        const sponsor = gameState.availableSponsors.find(s => s.id === sponsorId);
+        if (sponsor) {
+            setGameState({
+                ...gameState,
+                funds: gameState.funds + sponsor.signingBonus,
+                activeSponsor: sponsor,
+                availableSponsors: []
+            });
+        }
+    };
+    
+    const handleMessageRead = (id: string) => {
+        if (!gameState) return;
+        const msg = gameState.inbox.find(m => m.id === id);
+        if (msg && !msg.read) {
+            setGameState({ ...gameState, inbox: gameState.inbox.map(m => m.id === id ? {...m, read: true} : m) });
+        }
+    };
+
+    const handleMessageDelete = (id: string) => {
+        if (!gameState) return;
+        setGameState({ ...gameState, inbox: gameState.inbox.filter(m => m.id !== id) });
+    };
+
+    const renderScreen = () => {
+        if (!gameState) return <TeamSelectionScreen onSelectTeam={handleSelectTeam} />;
+
+        const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId);
+        if (!myTeam) return <div>Error: Team not found</div>;
+
+        if (gameState.isOffseason && screen !== 'RECRUITMENT' && screen !== 'TRAINING_CAMP') {
+             return <OffseasonModal awards={gameState.seasonAwards} onStartRecruiting={() => setScreen('RECRUITMENT')} />;
+        }
+        
+        if (gameState.activeGame && !gameState.activeGame.isGameOver && screen !== 'PLAY_GAME') {
+            setScreen('PLAY_GAME'); // Force to game screen if game is active
+        }
+
+        switch (screen) {
+            case 'ROSTER': return <RosterScreen team={myTeam} onPlayerSelect={setSelectedPlayer} onBack={() => setScreen('MAIN_MENU')} />;
+            case 'SCHEDULE': return <ScheduleScreen schedule={gameState.schedule[myTeam.id]} teams={gameState.teams} myTeamId={myTeam.id} week={gameState.week} onGameClick={handleGameModalClick} onBack={() => setScreen('MAIN_MENU')} />;
+            case 'STANDINGS': return <StandingsScreen teams={gameState.teams} rankings={gameState.nationalRankings} myTeamId={myTeam.id} onBack={() => setScreen('MAIN_MENU')} />;
+            case 'NATIONAL_STATS': return <NationalStatsScreen teams={gameState.teams} onBack={() => setScreen('MAIN_MENU')} />;
+            case 'FACILITIES': return <FacilitiesScreen facilities={gameState.facilities} funds={gameState.funds} onUpgrade={handleUpgradeFacility} onBack={() => setScreen('MAIN_MENU')} />;
+            case 'TACTICS': return <TacticsScreen strategy={gameState.myStrategy} onStrategyChange={(s) => setGameState({...gameState, myStrategy: s})} onBack={() => setScreen('MAIN_MENU')} />;
+            case 'STAFF': return <StaffScreen gameState={gameState} onHire={handleHireStaff} onBack={() => setScreen('MAIN_MENU')} />;
+            case 'SPONSORS': return <SponsorsScreen gameState={gameState} onSelect={handleSelectSponsor} onBack={() => setScreen('MAIN_MENU')} />;
+            case 'AWARD_RACES': return <AwardRacesScreen gameState={gameState} onBack={() => setScreen('MAIN_MENU')} />;
+            case 'TROPHY_CASE': return <TrophyCaseScreen trophies={gameState.trophyCase} onBack={() => setScreen('MAIN_MENU')} />;
+            case 'INBOX': return <InboxScreen gameState={gameState} onRead={handleMessageRead} onDelete={handleMessageDelete} onBack={() => setScreen('MAIN_MENU')} />;
+            case 'GOD_MODE': return <GodModeScreen onToggleForceWin={() => setGameState({...gameState, forceWinNextGame: !gameState.forceWinNextGame})} forceWin={gameState.forceWinNextGame} onBack={() => setScreen('MAIN_MENU')} />;
+            case 'RECRUITMENT': return <RecruitmentScreen recruits={gameState.recruits} recruitingPoints={gameState.recruitingPoints} onSign={handleSignRecruit} onFinish={handleFinishRecruiting} signedRecruits={signedRecruits} />;
+            case 'TRAINING_CAMP': return <TrainingCampScreen roster={myTeam.roster} recruits={signedRecruits} funds={gameState.funds} onFinish={handleFinishTraining} onSelectProgram={handleTrainingSelection} selections={trainingSelections} />;
+            case 'PLAY_GAME':
+                if (gameState.activeGame?.isGameOver) {
+                    return <Button onClick={handleFinishPlayableGame} className="text-center justify-center m-8">Game Over! View Results</Button>
+                }
+                return gameState.activeGame ? <PlayGameScreen activeGame={gameState.activeGame} myTeam={myTeam} opponentTeam={gameState.teams.find(t => t.id === gameState.activeGame?.opponentId)!} onPlay={handlePlayAction} onSkip={handleSkipGame} /> : <div>No Active Game</div>;
+            case 'GAME_OVER': return <GameOverScreen season={gameState.season} onRestart={() => setGameState(null)} />;
+            case 'MAIN_MENU':
+            default:
+                const nextOpponentId = GameService.findNextOpponentId(gameState);
+                const nextOpponent = nextOpponentId ? gameState.teams.find(t => t.id === nextOpponentId) : null;
+                const nextGame = gameState.schedule[myTeam.id].find(g => g.week === gameState.week);
+                const unreadMessages = gameState.inbox.filter(m => !m.read).length;
+                return (
+                    <ScreenWrapper screenKey="MAIN_MENU">
+                        <MainMenu onNavigate={setScreen} unreadMessages={unreadMessages} />
+                        {gameState.lastGameResult && <GameResultModal result={gameState.lastGameResult} myTeamName={myTeam.name} opponentName={gameState.teams.find(t => t.id === gameState.lastGameResult?.opponentId)?.name || ''} onContinue={() => setGameState({...gameState, lastGameResult: null})} />}
+                        <div className="p-4">
+                            {nextOpponent && nextGame ? (
+                                <>
+                                    <Button onClick={() => handlePlayGame(nextGame, nextOpponent)} className="mb-2 text-center justify-center">Play Week {gameState.week} vs {nextOpponent.name}</Button>
+                                    <Button onClick={handleAdvanceWeek} className="text-center justify-center">Sim Week {gameState.week}</Button>
+                                </>
+                            ) : <p>Offseason in progress...</p>}
+                        </div>
+                    </ScreenWrapper>
+                );
+        }
+    };
+
+    const myTeam = gameState?.teams.find(t => t.id === gameState.myTeamId);
 
     return (
-        <Modal onClose={onClose} size="3xl">
-            <h2 className={`font-press-start text-3xl mb-2 text-center ${didWin ? 'text-green-400' : 'text-red-400'}`}>{didWin ? 'VICTORY' : 'DEFEAT'}</h2>
-            {isRivalry && didWin && (
-                <div className="text-center p-2 mb-4 bg-yellow-500/20 border-2 border-dashed border-yellow-400">
-                    <p className="font-press-start text-yellow-300">RIVALRY WIN!</p>
-                    <p className="text-sm text-yellow-400">+$25,000 | +10% Fan Happiness</p>
-                </div>
-            )}
-            <div className="text-center text-2xl mb-6 flex justify-center items-center gap-4">
-                <span className="font-bold">{myTeam.name}</span>
-                <span className="font-press-start text-cyan-400">{result.myScore} - {result.opponentScore}</span>
-                <span className="font-bold">{opponent.name}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-4 border-t-2 border-gray-700 pt-4">
-                <div className="space-y-4">
-                    <h3 className="font-press-start text-xl">{myTeam.name}</h3>
-                    <PerfStat title="Leading Passer" data={myTopPasser} />
-                    <PerfStat title="Leading Rusher" data={myTopRusher} />
-                    <PerfStat title="Leading Receiver" data={myTopReceiver} />
-                </div>
-                 <div className="space-y-4 text-right">
-                    <h3 className="font-press-start text-xl">{opponent.name}</h3>
-                    <PerfStat title="Leading Passer" data={oppTopPasser} />
-                    <PerfStat title="Leading Rusher" data={oppTopRusher} />
-                    <PerfStat title="Leading Receiver" data={oppTopReceiver} />
-                </div>
-            </div>
-            <div className="mt-8 text-center">
-                <Button onClick={onClose} className="!text-center w-1/2 mx-auto">Continue</Button>
-            </div>
-        </Modal>
-    )
-  }
-
-  return (
-    <div className="container mx-auto max-w-7xl bg-gray-900 border-x-2 border-cyan-700/50 min-h-screen">
-      {loadingText && <Loading text={loadingText} />}
-      {selectedPlayer && <PlayerModal player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />}
-      {showGodModePassword && <GodModePasswordModal />}
-      {showPreGameModal && <PreGameModal />}
-      {showGameResultModal && gameState && <GameResultModal modalData={showGameResultModal} teams={gameState.teams} myTeamId={gameState.myTeamId!} onClose={() => setShowGameResultModal(null)} onPlayerSelected={(p) => { setSelectedPlayer(p); }}/>}
-      {renderScreen()}
-    </div>
-  );
+        <div className="container mx-auto max-w-7xl bg-gray-900 border-x-2 border-cyan-600 min-h-screen">
+            {loading && <Loading text={loading} />}
+            {myTeam && screen !== 'TEAM_SELECTION' && <Header teamName={myTeam.name} funds={gameState!.funds} season={gameState!.season} week={gameState!.week} />}
+            <main>
+                {renderScreen()}
+            </main>
+            {selectedPlayer && <PlayerEditModal player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />}
+            {modal?.type === 'gameSummary' && <GameSummaryModal game={modal.game} myTeam={myTeam!} opponent={modal.opponent} onClose={() => setModal(null)} />}
+            {modal?.type === 'scoutingReport' && <ScoutingReportModal team={modal.opponent} onClose={() => setModal(null)} />}
+        </div>
+    );
 };
 
 export default App;

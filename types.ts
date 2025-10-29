@@ -117,7 +117,9 @@ export interface SeasonAwards {
 export interface Sponsor {
     id: string;
     name: string;
-    weeklyPayout: number;
+    type: 'Local' | 'Regional' | 'National';
+    payoutPerWin: number;
+    signingBonus: number;
     duration: number; // in seasons
 }
 
@@ -125,16 +127,18 @@ export interface InboxMessage {
     id:string;
     week: number;
     season: number;
+    from: string;
     subject: string;
     body: string;
     read: boolean;
 }
 
-export interface Coach {
+export interface Staff {
     id: string;
     name: string;
-    specialty: 'OC' | 'DC' | 'ST';
-    rating: number; // 1-10
+    type: 'OC' | 'DC' | 'Trainer' | 'Doctor';
+    rating: number; // 1-100
+    salary: number;
 }
 
 export interface Trophy {
@@ -194,13 +198,11 @@ export interface GameState {
   seasonAwards: SeasonAwards;
   // New detailed features
   fanHappiness: number; // 0-100
-  sponsors: Sponsor[];
+  activeSponsor: Sponsor | null;
+  availableSponsors: Sponsor[];
   inbox: InboxMessage[];
-  coaches: {
-      OC: Coach | null;
-      DC: Coach | null;
-      ST: Coach | null;
-  };
+  staff: Staff[];
+  staffMarket: Staff[];
   myStrategy: GameStrategy;
   trophyCase: Trophy[];
   recruitingPoints: number;
@@ -231,4 +233,6 @@ export type Screen =
   | 'TACTICS'
   | 'PLAY_GAME'
   | 'TROPHY_CASE'
-  | 'TRAINING_CAMP';
+  | 'TRAINING_CAMP'
+  | 'AWARD_RACES'
+  | 'STAFF';

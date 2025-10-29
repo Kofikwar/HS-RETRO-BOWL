@@ -58,3 +58,11 @@ export const LAST_NAMES: string[] = [
   "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin",
   "Lee", "Perez", "Thompson", "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson"
 ];
+
+export const STAFF_FIRST_NAMES: string[] = [
+    "Bill", "Vince", "Tom", "Andy", "Sean", "Pete", "Mike", "John", "Kyle", "Nick", "Don"
+];
+
+export const STAFF_LAST_NAMES: string[] = [
+    "Belichick", "Lombardi", "Landry", "Reid", "McVay", "Carroll", "Tomlin", "Harbaugh", "Shanahan", "Saban", "Shula"
+];

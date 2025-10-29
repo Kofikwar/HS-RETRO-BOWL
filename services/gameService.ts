@@ -1,12 +1,14 @@
 
+import { Game, Player, Position, Team, GameState, GameStrategy, PlayerStats, Recruit, PlayoffMatchup, SeasonAwards, OffensivePlaybook, DefensivePlaybook, Trophy, ActiveGameState, OffensivePlay, PlayOutcome, StatEvent, TrainingProgram, Staff, Sponsor, InboxMessage } from '../types';
+import { POWERHOUSE_TEAMS, OTHER_TEAM_NAMES, FIRST_NAMES, LAST_NAMES, MAX_SEASONS, STAFF_FIRST_NAMES, STAFF_LAST_NAMES } from '../constants';
 
-import { Game, Player, Position, Team, GameState, GameStrategy, PlayerStats, Recruit, PlayoffMatchup, SeasonAwards, OffensivePlaybook, DefensivePlaybook, Trophy, ActiveGameState, OffensivePlay, PlayOutcome, StatEvent, TrainingProgram } from '../types';
-import { POWERHOUSE_TEAMS, OTHER_TEAM_NAMES, FIRST_NAMES, LAST_NAMES, MAX_SEASONS } from '../constants';
-
-const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+// FIX: Export 'rand' to make it accessible in other modules.
+export const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 const choice = <T,>(arr: T[]): T => arr[rand(0, arr.length - 1)];
 
 const generateName = () => `${choice(FIRST_NAMES)} ${choice(LAST_NAMES)}`;
+const generateStaffName = () => `${choice(STAFF_FIRST_NAMES)} ${choice(STAFF_LAST_NAMES)}`;
+
 const initialStats = (): PlayerStats => ({ gamesPlayed: 0, passYds: 0, passTDs: 0, rushYds: 0, rushTDs: 0, recYds: 0, recTDs: 0, tackles: 0, sacks: 0, ints: 0 });
 
 const generateAttributes = (position: Position) => {
@@ -60,6 +62,42 @@ export const generateRoster = (): Player[] => {
   return roster;
 };
 
+export const generateStaff = (count: number): Staff[] => {
+    const staff: Staff[] = [];
+    const types: Staff['type'][] = ['OC', 'DC', 'Trainer', 'Doctor'];
+    for(let i=0; i<count; i++) {
+        const type = choice(types);
+        const rating = rand(50, 95);
+        staff.push({
+            id: crypto.randomUUID(),
+            name: generateStaffName(),
+            type,
+            rating,
+            salary: 10000 + (rating - 50) * 1000,
+        });
+    }
+    return staff;
+}
+
+export const generateSponsors = (fanHappiness: number, season: number): Sponsor[] => {
+    const sponsors: Sponsor[] = [];
+    const numOffers = rand(2, 4);
+    for(let i=0; i<numOffers; i++) {
+        const type = fanHappiness > 80 ? 'National' : fanHappiness > 60 ? 'Regional' : 'Local';
+        const basePayout = type === 'National' ? 20000 : type === 'Regional' ? 10000 : 5000;
+        sponsors.push({
+            id: crypto.randomUUID(),
+            name: `${type} Sponsor #${i+1}`,
+            type,
+            payoutPerWin: basePayout + rand(-2000, 2000),
+            signingBonus: basePayout * rand(3,5),
+            duration: rand(1,3),
+        });
+    }
+    return sponsors;
+};
+
+
 export const calculateTeamOVR = (roster: Player[]): number => {
     if (roster.length === 0) return 30;
     const sortedRoster = [...roster].filter(p => p.isInjured === 0).sort((a, b) => b.attributes.OVR - a.attributes.OVR);
@@ -108,14 +146,16 @@ export const initializeGameWorld = (): Omit<GameState, 'myTeamId'> => {
     playoffBracket: null, lastGameResult: null, gameLog: [], recruits: [], isOffseason: false,
     seasonAwards: { mvp: null, allAmerican: [], bestQB: null, bestRB: null, bestWR: null, bestTE: null, bestOL: null, bestDL: null, bestLB: null, bestDB: null, bestKP: null },
     fanHappiness: 75,
-    sponsors: [],
+    activeSponsor: null,
+    availableSponsors: generateSponsors(75, 1),
     inbox: [],
-    coaches: { OC: null, DC: null, ST: null },
-    forceWinNextGame: false,
+    staff: [],
+    staffMarket: generateStaff(10),
     myStrategy: { offense: 'Balanced', defense: '4-3 Defense' },
     trophyCase: [],
     recruitingPoints: 0,
     activeGame: null,
+    forceWinNextGame: false,
   };
 };
 
@@ -281,11 +321,15 @@ export const simulateGame = (
     myFacilities: GameState['facilities'],
     opponentFacilities: { level: number; cost: number; },
     weather: Game['weather'],
-    forceWin: boolean
+    forceWin: boolean,
+    myStaff: Staff[]
 ): { didWin: boolean, result: NonNullable<Game['result']> } => {
     
-    const myOffenseOVR = (getPositionGroupOVR(myTeam.roster, ['QB', 'RB', 'WR', 'TE']) + getPositionGroupOVR(myTeam.roster, ['OL'])) / 2;
-    const myDefenseOVR = (getPositionGroupOVR(myTeam.roster, ['DL', 'LB']) + getPositionGroupOVR(myTeam.roster, ['DB'])) / 2;
+    const oc = myStaff.find(s => s.type === 'OC');
+    const dc = myStaff.find(s => s.type === 'DC');
+    
+    const myOffenseOVR = ((getPositionGroupOVR(myTeam.roster, ['QB', 'RB', 'WR', 'TE']) + getPositionGroupOVR(myTeam.roster, ['OL'])) / 2) + (oc ? oc.rating / 10 : 0);
+    const myDefenseOVR = ((getPositionGroupOVR(myTeam.roster, ['DL', 'LB']) + getPositionGroupOVR(myTeam.roster, ['DB'])) / 2) + (dc ? dc.rating / 10 : 0);
     const oppOffenseOVR = (getPositionGroupOVR(opponent.roster, ['QB', 'RB', 'WR', 'TE']) + getPositionGroupOVR(opponent.roster, ['OL'])) / 2;
     const oppDefenseOVR = (getPositionGroupOVR(opponent.roster, ['DL', 'LB']) + getPositionGroupOVR(opponent.roster, ['DB'])) / 2;
 
@@ -304,7 +348,7 @@ export const simulateGame = (
         const isMyPossession = i % 2 === 0;
         const offenseOVR = isMyPossession ? myOffenseOVR : oppOffenseOVR;
         const defenseOVR = isMyPossession ? oppDefenseOVR : myDefenseOVR;
-
+        
         // Base success on OVR matchup, with randomness. A 10 point OVR advantage should be significant.
         const advantage = offenseOVR - defenseOVR;
         const baseSuccess = 50 + advantage * 1.5 + weatherMod + rand(-15, 15);
@@ -396,21 +440,30 @@ export const simulateGame = (
     };
 };
 
-export const applyGameResults = (myTeam: Team, opponent: Team, gameResult: ReturnType<typeof simulateGame>, schedule: GameState['schedule']) => {
+export const applyGameResults = (gameState: GameState, myTeam: Team, opponent: Team, gameResult: ReturnType<typeof simulateGame>) => {
     const { result, didWin } = gameResult;
-    if (didWin) myTeam.record.wins++; else myTeam.record.losses++;
+    if (didWin) {
+        myTeam.record.wins++;
+        if (gameState.activeSponsor) {
+            gameState.funds += gameState.activeSponsor.payoutPerWin;
+        }
+    } else {
+        myTeam.record.losses++;
+    }
+
     if (!didWin) opponent.record.wins++; else opponent.record.losses++;
     
-    const week = myTeam.record.wins + myTeam.record.losses;
+    const week = gameState.week;
     
     const updateScheduleForTeam = (teamId: number, oppId: number, score: number, oppScore: number, playerStats: { myTeam: Record<string, Partial<PlayerStats>>, opponentTeam: Record<string, Partial<PlayerStats>>}) => {
-         const game = schedule[teamId]?.find(g => g.week === week && g.opponentId === oppId);
+         const game = gameState.schedule[teamId]?.find(g => g.week === week && g.opponentId === oppId);
          if (game) {
              game.result = { ...result, myScore: score, opponentScore: oppScore, playerStats };
          }
     };
     updateScheduleForTeam(myTeam.id, opponent.id, result.myScore, result.opponentScore, result.playerStats);
     updateScheduleForTeam(opponent.id, myTeam.id, result.opponentScore, result.myScore, { myTeam: result.playerStats.opponentTeam, opponentTeam: result.playerStats.myTeam});
+    gameState.lastGameResult = result;
 
     const applyStatsToRoster = (roster: Player[], stats: Record<string, Partial<PlayerStats>>) => {
         roster.forEach(p => {
@@ -428,11 +481,13 @@ export const applyGameResults = (myTeam: Team, opponent: Team, gameResult: Retur
     applyStatsToRoster(myTeam.roster, result.playerStats.myTeam);
     applyStatsToRoster(opponent.roster, result.playerStats.opponentTeam);
 
+    const doctor = gameState.staff.find(s => s.type === 'Doctor');
+    const injuryModifier = doctor ? doctor.rating / 50 : 1; // Good doctor reduces injury time
 
     myTeam.roster.forEach(p => {
         p.currentStamina = Math.max(0, p.currentStamina - rand(20, 40));
         p.morale = Math.max(0, Math.min(100, p.morale + (didWin ? rand(1, 5) : rand(-5, -1))));
-        if (rand(1, 100) > 98) p.isInjured = rand(1, 4);
+        if (rand(1, 100) > 98) p.isInjured = Math.max(1, Math.round(rand(1, 4) / injuryModifier));
     });
 
     myTeam.ovr = calculateTeamOVR(myTeam.roster);
@@ -456,13 +511,14 @@ export const simulateOtherGames = (gameState: GameState) => {
         
         const opponent = gameState.teams.find(t => t.id === game.opponentId)!;
         
-        const result = simulateGame(team, opponent, {offense: 'Balanced', defense: '4-3 Defense'}, {offense: 'Balanced', defense: '4-3 Defense'}, { coaching: {level:1, cost: 0}, training: {level:1, cost:0}, rehab: {level:1, cost:0}}, {level:1, cost:0}, game.weather || 'Sunny', false);
+        const result = simulateGame(team, opponent, {offense: 'Balanced', defense: '4-3 Defense'}, {offense: 'Balanced', defense: '4-3 Defense'}, { coaching: {level:1, cost: 0}, training: {level:1, cost:0}, rehab: {level:1, cost:0}}, {level:1, cost:0}, game.weather || 'Sunny', false, []);
         
-        applyGameResults(team, opponent, result, gameState.schedule);
+        applyGameResults(gameState, team, opponent, result);
 
         teamsPlayedThisWeek.add(team.id);
         teamsPlayedThisWeek.add(opponent.id);
     }
+    return gameState;
 };
 
 export const findNextOpponentId = (gameState: GameState): number | null => {
@@ -567,7 +623,7 @@ export const generateRecruits = (season: number): Recruit[] => {
 };
 
 // Player progression/regression
-const progressPlayer = (player: Player, coachingLevel: number) => {
+const progressPlayer = (player: Player, coachingLevel: number, trainerRating: number) => {
     if (player.year === 'SR') return; // Seniors graduate, no progression
     
     const potential = player.attributes.Potential;
@@ -582,7 +638,7 @@ const progressPlayer = (player: Player, coachingLevel: number) => {
 
         const currentVal = player.attributes[attr];
         // Improvement chance is based on potential and coaching
-        const improveChance = (potential + coachingLevel * 5) / 150;
+        const improveChance = (potential + coachingLevel * 5 + trainerRating / 5) / 170;
         
         if (Math.random() < improveChance && currentVal < 99) {
             // Amount of improvement is based on consistency and age
@@ -609,6 +665,8 @@ export const startOffseason = (gameState: GameState): GameState => {
     }
     
     const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
+    const trainer = gameState.staff.find(s => s.type === 'Trainer');
+    const trainerRating = trainer ? trainer.rating : 0;
 
     // Player progression for ALL teams
     gameState.teams.forEach(team => {
@@ -617,7 +675,8 @@ export const startOffseason = (gameState: GameState): GameState => {
         // Progress remaining players
         team.roster.forEach(player => {
             const facilityLevel = team.id === gameState.myTeamId ? gameState.facilities.coaching.level : 1;
-            progressPlayer(player, facilityLevel);
+            const staffRating = team.id === gameState.myTeamId ? trainerRating : 0;
+            progressPlayer(player, facilityLevel, staffRating);
         });
         team.ovr = calculateTeamOVR(team.roster);
     });
@@ -729,6 +788,8 @@ export const advanceToNextSeason = (gameState: GameState, signedRecruits: Recrui
     });
 
     newState.nationalRankings = updateRankings(newState.teams);
+    newState.availableSponsors = generateSponsors(newState.fanHappiness, newState.season);
+    newState.staffMarket = generateStaff(10);
 
     return newState;
 };
@@ -777,17 +838,18 @@ export const updatePlayoffBracket = (gameState: GameState, myTeamId: number, opp
     return false; // Not eliminated
 };
 
-export const simulatePlay = (myTeam: Team, opponent: Team, play: OffensivePlay, yardLine: number): PlayOutcome => {
+export const simulatePlay = (myTeam: Team, opponent: Team, play: OffensivePlay, yardLine: number, staff: Staff[]): PlayOutcome => {
     const outcome: PlayOutcome = { description: '', yards: 0, isTurnover: false, isTouchdown: false, isComplete: true, statEvents: [] };
     
-    const qb = myTeam.roster.filter(p => p.position === 'QB').sort((a,b) => b.attributes.OVR - a.attributes.OVR)[0];
-    const rb = myTeam.roster.filter(p => p.position === 'RB').sort((a,b) => b.attributes.OVR - a.attributes.OVR)[0];
-    const wr = myTeam.roster.filter(p => p.position === 'WR').sort((a,b) => b.attributes.OVR - a.attributes.OVR)[0];
+    const qb = myTeam.roster.filter(p => p.position === 'QB' && p.isInjured === 0).sort((a,b) => b.attributes.OVR - a.attributes.OVR)[0];
+    const rb = myTeam.roster.filter(p => p.position === 'RB' && p.isInjured === 0).sort((a,b) => b.attributes.OVR - a.attributes.OVR)[0];
+    const wr = myTeam.roster.filter(p => p.position === 'WR' && p.isInjured === 0).sort((a,b) => b.attributes.OVR - a.attributes.OVR)[0];
 
     if (!qb || !rb || !wr) return {...outcome, description: "Missing key players!"};
 
-    const myOffenseOVR = myTeam.ovr;
-    const oppDefenseOVR = opponent.ovr; // Simplified for now
+    const oc = staff.find(s => s.type === 'OC');
+    const myOffenseOVR = myTeam.ovr + (oc ? oc.rating / 10 : 0);
+    const oppDefenseOVR = opponent.ovr;
     const advantage = myOffenseOVR - oppDefenseOVR;
 
     const isRun = ['Inside Run', 'Outside Run', 'Power Run', 'Draw Play'].includes(play);
@@ -796,31 +858,31 @@ export const simulatePlay = (myTeam: Team, opponent: Team, play: OffensivePlay, 
         const rusher = rb || qb;
         const result = rand(-2, 10) + Math.floor(advantage / 10) + Math.floor(rusher.attributes.Speed / 20);
         outcome.yards = result;
-        outcome.description = `${rusher.name} rushes for ${result} yards.`;
+        outcome.description = `${rusher.name} ${choice(['rushes up the middle', 'finds a hole', 'bounces outside'])} for ${result} yards.`;
         outcome.statEvents.push({ playerId: rusher.id, stat: 'rushYds', value: result });
     } else { // is pass
         const receiver = wr || rb;
         if (Math.random() * 100 < qb.attributes.Consistency + advantage / 2) {
             const result = rand(0, 25) + Math.floor(advantage / 10) + Math.floor(receiver.attributes.Catch / 20);
             outcome.yards = result;
-            outcome.description = `${qb.name} passes to ${receiver.name} for ${result} yards.`;
+            outcome.description = `${qb.name} ${choice(['fires a pass', 'drops back and throws', 'finds'])} to ${receiver.name} for ${result} yards.`;
             outcome.statEvents.push({ playerId: qb.id, stat: 'passYds', value: result });
             outcome.statEvents.push({ playerId: receiver.id, stat: 'recYds', value: result });
         } else {
             outcome.isComplete = false;
-            outcome.description = `${qb.name} pass incomplete.`;
+            outcome.description = `${qb.name} pass to ${receiver.name} is incomplete.`;
         }
     }
     
-    if (Math.random() > 0.95 - (advantage / 100)) {
+    if (Math.random() > 0.95 + (advantage / 100)) { // Turnovers are less likely with a big advantage
         outcome.isTurnover = true;
-        outcome.description += " TURNOVER!";
+        outcome.description += ` ${choice(['FUMBLE!', 'INTERCEPTION!'])} Turnover!`;
     }
     
     if (yardLine + outcome.yards >= 100) {
         outcome.isTouchdown = true;
         outcome.yards = 100 - yardLine;
-        outcome.description = `TOUCHDOWN! ${play}`;
+        outcome.description = `TOUCHDOWN! ${play === 'Hail Mary' ? 'A miracle catch!' : 'He takes it all the way!'}`;
         if (isRun) {
             outcome.statEvents.push({ playerId: rb.id, stat: 'rushTDs', value: 1 });
         } else {
@@ -846,13 +908,13 @@ export const simulateOpponentDrive = (myTeam: Team, opponent: Team): { score: nu
 }
 
 export const skipGameSimulation = (gameState: GameState): ActiveGameState => {
-    const { activeGame, myTeamId, teams, myStrategy } = gameState;
+    const { activeGame, myTeamId, teams, myStrategy, staff } = gameState;
     if (!activeGame) throw new Error("No active game to skip");
     
     const myTeam = teams.find(t => t.id === myTeamId)!;
     const opponent = teams.find(t => t.id === activeGame.opponentId)!;
 
-    const result = simulateGame(myTeam, opponent, myStrategy, {offense: 'Balanced', defense: '4-3 Defense'}, gameState.facilities, {level:1, cost: 0}, 'Sunny', gameState.forceWinNextGame);
+    const result = simulateGame(myTeam, opponent, myStrategy, {offense: 'Balanced', defense: '4-3 Defense'}, gameState.facilities, {level:1, cost: 0}, 'Sunny', gameState.forceWinNextGame, staff);
 
     return {
         ...activeGame,
@@ -899,11 +961,17 @@ export const applyPlayableGameResults = (gameState: GameState, activeGame: Activ
             opponentTeam: generateFullGameStats(opponent, activeGame.opponentScore)
         }
     };
+    
+    const game = updatedState.schedule[myTeam.id].find((g: Game) => g.week === updatedState.week);
+    if(game) {
+        game.result = updatedState.lastGameResult;
+    }
+
 
     if (updatedState.week < 13) updatedState.week++;
     
     // Simulate other games for the week after player's game is done
-    simulateOtherGames(updatedState);
+    updatedState = simulateOtherGames(updatedState);
     
     updatedState.nationalRankings = updateRankings(updatedState.teams);
 
@@ -917,7 +985,7 @@ export const applyPlayableGameResults = (gameState: GameState, activeGame: Activ
         }
     }
     if (updatedState.week > 10 && !updatedState.playoffBracket) {
-        const isPlayoffTeam = updatedState.nationalRankings.slice(0,8).some(t => t.teamId === myTeam.id);
+        const isPlayoffTeam = updatedState.nationalRankings.slice(0,8).some((t: {teamId: number}) => t.teamId === myTeam.id);
         if(!isPlayoffTeam) {
              updatedState = startOffseason(updatedState);
         }
@@ -925,4 +993,150 @@ export const applyPlayableGameResults = (gameState: GameState, activeGame: Activ
 
     updatedState.activeGame = null;
     return updatedState;
+};
+
+export const hireStaff = (gameState: GameState, staffId: string): GameState => {
+    const staffToHire = gameState.staffMarket.find(s => s.id === staffId);
+    if (!staffToHire || gameState.funds < staffToHire.salary) {
+        return gameState; // Not enough funds or staff not found
+    }
+
+    // Check if a staff of this type already exists and replace them
+    const existingStaffIndex = gameState.staff.findIndex(s => s.type === staffToHire.type);
+    if (existingStaffIndex !== -1) {
+        const oldStaff = gameState.staff[existingStaffIndex];
+        // For simplicity, we just fire the old one. Could be moved back to market.
+        gameState.staff.splice(existingStaffIndex, 1);
+    }
+
+    gameState.funds -= staffToHire.salary;
+    gameState.staff.push(staffToHire);
+    gameState.staffMarket = gameState.staffMarket.filter(s => s.id !== staffId);
+
+    return gameState;
+};
+
+export const generateScoutingReport = (opponent: Team): { strengths: string[], weaknesses: string[], keyPlayers: Player[] } => {
+    const roster = opponent.roster;
+    const strengths: string[] = [];
+    const weaknesses: string[] = [];
+
+    const ovrs = {
+        QB: getPositionGroupOVR(roster, ['QB']),
+        RB: getPositionGroupOVR(roster, ['RB']),
+        WR: getPositionGroupOVR(roster, ['WR', 'TE']),
+        OL: getPositionGroupOVR(roster, ['OL']),
+        DL: getPositionGroupOVR(roster, ['DL']),
+        LB: getPositionGroupOVR(roster, ['LB']),
+        DB: getPositionGroupOVR(roster, ['DB']),
+    };
+
+    if (ovrs.QB > 85) strengths.push("Elite Quarterback");
+    if (ovrs.QB < 70) weaknesses.push("Weak Quarterback Play");
+    if (ovrs.RB > 85) strengths.push("Dominant Rushing Attack");
+    if (ovrs.OL > 85) strengths.push("Impenetrable Offensive Line");
+    if (ovrs.OL < 70) weaknesses.push("Porous Offensive Line");
+    if (ovrs.WR > 85) strengths.push("Explosive Receiving Corps");
+    if (ovrs.DL > 85) strengths.push("Disruptive Defensive Line");
+    if (ovrs.DL < 70) weaknesses.push("Struggles to get pressure");
+    if (ovrs.DB > 85) strengths.push("Lockdown Secondary");
+    if (ovrs.DB < 70) weaknesses.push("Vulnerable Secondary");
+
+    if (strengths.length === 0) strengths.push("Well-rounded team");
+    if (weaknesses.length === 0) weaknesses.push("No glaring weaknesses");
+    
+    const keyPlayers = [...roster].sort((a,b) => b.attributes.OVR - a.attributes.OVR).slice(0, 3);
+
+    return { strengths, weaknesses, keyPlayers };
+};
+
+export const calculateAwardRaces = (teams: Team[]): Record<string, {player: Player, teamName: string}[]> => {
+    const allPlayers = teams.flatMap(t => {
+        const teamName = t.name;
+        return t.roster.map(p => ({ ...p, teamName }));
+    });
+    
+    const races: Record<string, {player: Player, teamName: string}[]> = {};
+    const awardCategories: { name: string, stat: keyof PlayerStats, positions: Position[] }[] = [
+        { name: 'MVP', stat: 'passTDs', positions: ['QB', 'RB', 'WR'] }, // Special logic for MVP
+        { name: 'Best QB', stat: 'passYds', positions: ['QB'] },
+        { name: 'Best RB', stat: 'rushYds', positions: ['RB'] },
+        { name: 'Best WR', stat: 'recYds', positions: ['WR', 'TE'] },
+        { name: 'Best DL', stat: 'sacks', positions: ['DL'] },
+        { name: 'Best LB', stat: 'tackles', positions: ['LB'] },
+        { name: 'Best DB', stat: 'ints', positions: ['DB'] },
+    ];
+
+    for (const category of awardCategories) {
+        let candidates = allPlayers.filter(p => category.positions.includes(p.position));
+        
+        if (category.name === 'MVP') {
+            candidates = candidates.sort((a,b) => 
+                ((b.seasonStats.passTDs + b.seasonStats.rushTDs + b.seasonStats.recTDs) * 2 + b.seasonStats.passYds / 10 + b.seasonStats.rushYds / 5) - 
+                ((a.seasonStats.passTDs + a.seasonStats.rushTDs + a.seasonStats.recTDs) * 2 + a.seasonStats.passYds / 10 + a.seasonStats.rushYds / 5)
+            );
+        } else {
+            candidates = candidates.sort((a, b) => (b.seasonStats[category.stat] || 0) - (a.seasonStats[category.stat] || 0));
+        }
+        
+        races[category.name] = candidates.filter(p => p.seasonStats.gamesPlayed > 0).slice(0, 5).map(p => ({ player: p, teamName: p.teamName }));
+    }
+    
+    return races;
+};
+
+export const generateWeeklyInbox = (gameState: GameState): InboxMessage[] => {
+    const { week, season, teams, myTeamId, staff } = gameState;
+    if (!myTeamId || gameState.isOffseason) return [];
+
+    const messages: InboxMessage[] = [];
+    const myTeam = teams.find(t => t.id === myTeamId)!;
+    const nextOpponentId = findNextOpponentId(gameState);
+    
+    // Message from coordinator about next opponent
+    if (nextOpponentId) {
+        const opponent = teams.find(t => t.id === nextOpponentId)!;
+        const report = generateScoutingReport(opponent);
+        const dc = staff.find(s => s.type === 'DC');
+        if (dc) {
+            messages.push({
+                id: crypto.randomUUID(), week, season, from: `DC ${dc.name}`, subject: `Scouting: ${opponent.name}'s Offense`,
+                body: `Coach, their strength is their ${report.strengths[0] || 'passing game'}. We should prepare our secondary. They struggle with their ${report.weaknesses[0] || 'run blocking'}. Let's exploit that.`, read: false
+            });
+        }
+    }
+
+    // Message from trainer about injuries
+    const trainer = staff.find(s => s.type === 'Trainer');
+    if (trainer) {
+        const injuredPlayers = myTeam.roster.filter(p => p.isInjured > 0);
+        if (injuredPlayers.length > 0) {
+            const player = injuredPlayers[0];
+            messages.push({
+                id: crypto.randomUUID(), week, season, from: `Trainer ${trainer.name}`, subject: 'Injury Update',
+                body: `${player.name} is recovering well. He should be back in ${player.isInjured} game(s).`, read: false
+            });
+        } else if (Math.random() > 0.7) {
+            messages.push({
+                 id: crypto.randomUUID(), week, season, from: `Trainer ${trainer.name}`, subject: 'All Clear',
+                body: `Good news, coach. No new injuries to report after last week's game. Everyone is healthy.`, read: false
+            });
+        }
+    }
+
+    // Message from a player
+    const randomPlayer = choice(myTeam.roster);
+    if (randomPlayer.morale < 60 && Math.random() > 0.5) {
+        messages.push({
+            id: crypto.randomUUID(), week, season, from: randomPlayer.name, subject: 'Feeling down',
+            body: `Coach, I haven't been feeling like myself lately. I'm not sure what it is, but my head's not in the game.`, read: false
+        });
+    } else if (randomPlayer.morale > 90 && Math.random() > 0.5) {
+        messages.push({
+            id: crypto.randomUUID(), week, season, from: randomPlayer.name, subject: 'Ready to go!',
+            body: `Coach, I feel incredible! Ready to go out there and leave it all on the field this week!`, read: false
+        });
+    }
+    
+    return messages;
 };
