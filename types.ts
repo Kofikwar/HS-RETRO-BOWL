@@ -122,7 +122,7 @@ export interface Sponsor {
 }
 
 export interface InboxMessage {
-    id: string;
+    id:string;
     week: number;
     season: number;
     subject: string;
@@ -209,6 +209,8 @@ export interface GameState {
   activeGame: ActiveGameState | null;
 }
 
+export type TrainingProgram = 'NONE' | 'CONDITIONING' | 'STRENGTH' | 'AGILITY' | 'PASSING' | 'RECEIVING' | 'TACKLING';
+
 export type Screen = 
   | 'TEAM_SELECTION'
   | 'MAIN_MENU'
@@ -228,4 +230,5 @@ export type Screen =
   | 'INBOX'
   | 'TACTICS'
   | 'PLAY_GAME'
-  | 'TROPHY_CASE';
+  | 'TROPHY_CASE'
+  | 'TRAINING_CAMP';

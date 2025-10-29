@@ -1,7 +1,7 @@
 
 
 import * as React from 'react';
-import { GameState, Screen, Team, Player, Game, Position, GameStrategy, Recruit, PlayerStats, OffensivePlaybook, DefensivePlaybook, SeasonAwards, Trophy, ActiveGameState, OffensivePlay } from './types';
+import { GameState, Screen, Team, Player, Game, Position, GameStrategy, Recruit, PlayerStats, OffensivePlaybook, DefensivePlaybook, SeasonAwards, Trophy, ActiveGameState, OffensivePlay, TrainingProgram } from './types';
 import { POWERHOUSE_TEAMS, MAX_SEASONS } from './constants';
 import * as GameService from './services/gameService';
 import { FootballIcon, RosterIcon, ScheduleIcon, StandingsIcon, FacilitiesIcon, AwardIcon, RecruitIcon, GodModeIcon, ChartIcon, InboxIcon, CoachIcon, SponsorIcon, TrophyIcon, TacticsIcon } from './components/Icons';
@@ -700,7 +700,7 @@ const RecruitmentScreen = ({ gameState, setGameState, onFinalizeRecruiting }: { 
                 <div className="flex justify-between items-center mb-6 p-4 bg-gray-800/50">
                     <h2 className="font-press-start text-xl">Recruiting Points: <span className="text-yellow-400">{recruitingPoints}</span></h2>
                     <Button onClick={() => onFinalizeRecruiting(signedRecruits)} className="!text-center w-auto border-green-400 text-green-400 hover:bg-green-400">
-                        Finalize Class & Advance
+                        Go To Training Camp
                     </Button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -712,6 +712,82 @@ const RecruitmentScreen = ({ gameState, setGameState, onFinalizeRecruiting }: { 
         </div>
     );
 }
+
+const TrainingCampScreen = ({ gameState, signedRecruits, onFinishTraining }: { gameState: GameState, signedRecruits: Recruit[], onFinishTraining: (selections: Record<string, TrainingProgram>) => void }) => {
+    const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
+    const [trainingSelections, setTrainingSelections] = React.useState<Record<string, TrainingProgram>>({});
+    
+    const trainingPrograms: Record<TrainingProgram, { name: string, cost: number, positions: Position[] }> = {
+      'NONE': { name: 'No Training', cost: 0, positions: ['QB', 'RB', 'WR', 'TE', 'OL', 'DL', 'LB', 'DB', 'K/P'] },
+      'CONDITIONING': { name: 'Conditioning (STA)', cost: 5000, positions: ['QB', 'RB', 'WR', 'TE', 'OL', 'DL', 'LB', 'DB', 'K/P'] },
+      'STRENGTH': { name: 'Strength (STR, BLK)', cost: 15000, positions: ['RB', 'TE', 'OL', 'DL', 'LB'] },
+      'AGILITY': { name: 'Agility (SPD)', cost: 15000, positions: ['QB', 'RB', 'WR', 'TE', 'LB', 'DB'] },
+      'PASSING': { name: 'Passing (PAS, CON)', cost: 25000, positions: ['QB'] },
+      'RECEIVING': { name: 'Receiving (CAT)', cost: 25000, positions: ['RB', 'WR', 'TE'] },
+      'TACKLING': { name: 'Tackling (TCK)', cost: 25000, positions: ['DL', 'LB', 'DB'] }
+    };
+    
+    const totalCost = Object.values(trainingSelections).reduce((sum, program) => sum + (trainingPrograms[program]?.cost || 0), 0);
+    const canAfford = gameState.funds >= totalCost;
+    
+    const handleSelectionChange = (playerId: string, program: TrainingProgram) => {
+        setTrainingSelections(prev => ({...prev, [playerId]: program}));
+    };
+
+    const combinedRoster = [...myTeam.roster, ...signedRecruits].sort((a, b) => b.attributes.OVR - a.attributes.OVR);
+
+    return (
+        <div>
+            <Header title="Pre-Season Training Camp" />
+            <div className="p-4 md:p-8 max-w-5xl mx-auto">
+                 <div className="flex flex-col md:flex-row justify-between items-center mb-6 p-4 bg-gray-800/50">
+                    <div>
+                        <h2 className="font-press-start text-lg">Available Funds: <span className="text-green-400">${gameState.funds.toLocaleString()}</span></h2>
+                        <h2 className="font-press-start text-lg">Total Cost: <span className={canAfford ? 'text-yellow-400' : 'text-red-500'}>${totalCost.toLocaleString()}</span></h2>
+                    </div>
+                    <Button onClick={() => onFinishTraining(trainingSelections)} disabled={!canAfford} className="!text-center w-full md:w-auto mt-4 md:mt-0 border-green-400 text-green-400 hover:bg-green-400">
+                        Start New Season
+                    </Button>
+                </div>
+                <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+                    <table className="w-full text-sm">
+                        <thead className="text-left text-gray-400 uppercase sticky top-0 bg-gray-900">
+                            <tr>
+                                <th className="p-2">Player</th>
+                                <th className="p-2">Pos</th>
+                                <th className="p-2">OVR</th>
+                                <th className="p-2 w-1/2">Training Program</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {combinedRoster.map(player => (
+                                <tr key={player.id} className="border-b border-gray-700">
+                                    <td className="p-2 font-bold">{player.name} {signedRecruits.some(r => r.id === player.id) ? '(R)' : ''}</td>
+                                    <td className="p-2">{player.position}</td>
+                                    <td className="p-2">{player.attributes.OVR}</td>
+                                    <td className="p-2">
+                                        <select
+                                            value={trainingSelections[player.id] || 'NONE'}
+                                            onChange={(e) => handleSelectionChange(player.id, e.target.value as TrainingProgram)}
+                                            className="w-full bg-gray-800 border border-gray-600 p-1"
+                                        >
+                                            {Object.entries(trainingPrograms).map(([key, program]) => {
+                                                if (program.positions.includes(player.position)) {
+                                                    return <option key={key} value={key}>{program.name} - ${program.cost.toLocaleString()}</option>
+                                                }
+                                                return null;
+                                            })}
+                                        </select>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const PlayerModal = ({ player, onClose }: { player: Player, onClose: () => void }) => {
     const statCategories: (keyof PlayerStats)[] = ['gamesPlayed', 'passYds', 'passTDs', 'rushYds', 'rushTDs', 'recYds', 'recTDs', 'tackles', 'sacks', 'ints'];
@@ -787,6 +863,7 @@ const App = () => {
   const [showGodModePassword, setShowGodModePassword] = React.useState(false);
   const [showPreGameModal, setShowPreGameModal] = React.useState(false);
   const [showGameResultModal, setShowGameResultModal] = React.useState<{ result: NonNullable<Game['result']>, isRivalry: boolean } | null>(null);
+  const [offseasonSignedRecruits, setOffseasonSignedRecruits] = React.useState<Recruit[]>([]);
 
 
   const handleTeamSelection = (teamId: number) => {
@@ -863,13 +940,23 @@ const App = () => {
   }
 
   const handleFinalizeRecruiting = (signedRecruits: Recruit[]) => {
+    setOffseasonSignedRecruits(signedRecruits);
+    setScreen('TRAINING_CAMP');
+  }
+
+  const handleFinishTraining = (trainingSelections: Record<string, TrainingProgram>) => {
     setLoadingText("Advancing to next season...");
     setTimeout(() => {
-        setGameState(prev => prev ? GameService.advanceToNextSeason(prev, signedRecruits) : null);
+        setGameState(prev => {
+            if (!prev) return null;
+            const { updatedState, updatedRecruits } = GameService.applyTrainingCampResults(prev, trainingSelections, offseasonSignedRecruits);
+            return GameService.advanceToNextSeason(updatedState, updatedRecruits);
+        });
+        setOffseasonSignedRecruits([]);
         setScreen('MAIN_MENU');
         setLoadingText('');
     }, 1000);
-  }
+  };
 
   const handleStartPlayableGame = () => {
     setShowPreGameModal(false);
@@ -961,6 +1048,8 @@ const App = () => {
           return <ScreenWrapper screenKey={currentScreen} children={<GameplayScreen gameState={gameState} setGameState={setGameState} onGameEnd={handleFinishPlayableGame} />} />;
       case 'RECRUITMENT':
           return <ScreenWrapper screenKey={currentScreen} children={<RecruitmentScreen gameState={gameState} setGameState={setGameState} onFinalizeRecruiting={handleFinalizeRecruiting} />} />;
+      case 'TRAINING_CAMP':
+          return <ScreenWrapper screenKey={currentScreen} children={<TrainingCampScreen gameState={gameState} signedRecruits={offseasonSignedRecruits} onFinishTraining={handleFinishTraining} />} />;
       default:
         return <ScreenWrapper screenKey="MAIN_MENU" children={<MainMenu gameState={gameState} setScreen={setScreen} onPlayNextGame={() => setShowPreGameModal(true)} onStartRecruitment={handleStartRecruitment} onGodModeClick={() => godModeUnlocked ? setScreen('GOD_MODE') : setShowGodModePassword(true)} />} />;
     }
@@ -1166,7 +1255,8 @@ const App = () => {
     const didWin = result.myScore > result.opponentScore;
 
     const findTopPerformer = (team: Team, teamStats: Record<string, Partial<PlayerStats>>, stat: keyof PlayerStats) => {
-        const topPlayerId = Object.keys(teamStats).sort((a, b) => (teamStats[b][stat] || 0) - (teamStats[a][stat] || 0))[0];
+// FIX: Cast stat values to number to fix type inference issues.
+        const topPlayerId = Object.keys(teamStats).sort((a, b) => ((teamStats[b][stat] as number) || 0) - ((teamStats[a][stat] as number) || 0))[0];
         if (!topPlayerId) return null;
         const player = team.roster.find(p => p.id === topPlayerId);
         return { player, value: teamStats[topPlayerId][stat] };
