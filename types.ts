@@ -1,5 +1,7 @@
 
 
+export type PlayerTrait = 'Clutch' | 'Injury Prone' | 'Team Captain' | 'Workhorse';
+
 export interface PlayerStats {
   gamesPlayed: number;
   passYds: number;
@@ -35,11 +37,14 @@ export interface Player {
   isInjured: number; // Games remaining on injury
   morale: number; // 0-100
   currentStamina: number; // 0-100
+  traits: PlayerTrait[];
+  gpa: number;
+  isSuspended: boolean;
 }
 
 export type Position = 'QB' | 'RB' | 'WR' | 'TE' | 'OL' | 'DL' | 'LB' | 'DB' | 'K/P';
 
-export interface Recruit extends Omit<Player, 'year' | 'careerStats' | 'isInjured' | 'seasonStats' | 'morale' | 'currentStamina'> {
+export interface Recruit extends Omit<Player, 'year' | 'careerStats' | 'isInjured' | 'seasonStats' | 'morale' | 'currentStamina' | 'isSuspended'> {
   cost: number;
 }
 
@@ -64,6 +69,8 @@ export interface Game {
     myScore: number;
     opponentScore: number;
     summary: string;
+    headline?: string;
+    newspaperSummary?: string;
     playerStats: {
       myTeam: Record<string, Partial<PlayerStats>>;
       opponentTeam: Record<string, Partial<PlayerStats>>;
@@ -139,6 +146,7 @@ export interface Staff {
     type: 'OC' | 'DC' | 'Trainer' | 'Doctor';
     rating: number; // 1-100
     salary: number;
+    scheme?: OffensivePlaybook | DefensivePlaybook;
 }
 
 export interface Trophy {
@@ -161,6 +169,7 @@ export interface ActiveGameState {
   opponentId: number;
   playLog: string[];
   isGameOver: boolean;
+  momentum: number; // -100 (opponent) to 100 (player)
 }
 
 export interface StatEvent {
@@ -173,8 +182,9 @@ export interface PlayOutcome {
     yards: number;
     isTurnover: boolean;
     isTouchdown: boolean;
-isComplete: boolean;
+    isComplete: boolean;
     statEvents: StatEvent[];
+    newMomentum: number;
 }
 
 export interface GameState {
@@ -188,6 +198,7 @@ export interface GameState {
     coaching: { level: number; cost: number };
     training: { level: number; cost: number };
     rehab: { level: number; cost: number };
+    tutoring: { level: number; cost: number };
   };
   nationalRankings: { teamId: number; rank: number }[];
   playoffBracket: { round: number; matchups: PlayoffMatchup[] }[] | null;

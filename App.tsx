@@ -127,9 +127,15 @@ const RosterScreen = ({ team, onPlayerSelect, onBack }: { team: Team, onPlayerSe
                     </thead>
                     <tbody>
                         {sortedRoster.map(p => (
-                            <tr key={p.id} className={`border-b border-gray-700 ${p.isInjured > 0 ? 'bg-red-900/50' : ''}`} onClick={() => onPlayerSelect(p)}>
+                            <tr key={p.id} className={`border-b border-gray-700 ${p.isInjured > 0 ? 'bg-red-900/50' : ''} ${p.isSuspended ? 'bg-yellow-900/50' : ''}`} onClick={() => onPlayerSelect(p)}>
                                 <td className="p-2"><span className={`px-2 py-1 text-xs font-bold rounded ${getPositionColor(p.position)}`}>{p.position}</span></td>
-                                <td className="p-2">{p.name} {p.isInjured > 0 && <span className="text-red-500">(Inj {p.isInjured}w)</span>}</td>
+                                <td className="p-2">
+                                    {p.name}
+                                    {p.traits.includes('Team Captain') && <span title="Team Captain" className="ml-1">©️</span>}
+                                    {p.traits.includes('Clutch') && <span title="Clutch" className="ml-1">⭐</span>}
+                                    {p.isInjured > 0 && <span className="text-red-500 ml-1">(Inj {p.isInjured}w)</span>}
+                                    {p.isSuspended && <span className="text-yellow-500 ml-1">(Susp)</span>}
+                                </td>
                                 <td className="p-2">{p.year}</td>
                                 <td className={`p-2 font-bold ${getAttributeColor(p.attributes.OVR)}`}>{p.attributes.OVR}</td>
                                 <td className={`p-2 ${getAttributeColor(p.attributes.Speed)}`}>{p.attributes.Speed}</td>
@@ -151,7 +157,7 @@ const RosterScreen = ({ team, onPlayerSelect, onBack }: { team: Team, onPlayerSe
 const PlayerEditModal = ({ player, onClose }: { player: Player, onClose: () => void }) => (
     <Modal onClose={onClose} size="3xl">
         <h2 className="text-2xl font-press-start text-cyan-400 mb-4">{player.name} ({player.position})</h2>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <h3 className="text-lg font-press-start">Attributes</h3>
                 {Object.entries(player.attributes).map(([key, value]) => (
@@ -160,6 +166,11 @@ const PlayerEditModal = ({ player, onClose }: { player: Player, onClose: () => v
                         <span className={getAttributeColor(value)}>{value}</span>
                     </div>
                 ))}
+                 <div className="mt-4">
+                    <h3 className="text-lg font-press-start">Info</h3>
+                    <div className="flex justify-between"><span>GPA:</span> <span>{player.gpa.toFixed(2)} {player.isSuspended && <span className="text-yellow-500">(Suspended)</span>}</span></div>
+                    <div className="flex justify-between"><span>Traits:</span> <span>{player.traits.join(', ') || 'None'}</span></div>
+                 </div>
             </div>
             <div>
                  <h3 className="text-lg font-press-start mb-2">Season Stats</h3>
@@ -377,9 +388,12 @@ const FacilitiesScreen = ({ facilities, funds, onUpgrade, onBack }: { facilities
     </ScreenWrapper>
 );
 
-const TacticsScreen = ({ strategy, onStrategyChange, onBack }: { strategy: GameStrategy, onStrategyChange: (newStrategy: GameStrategy) => void, onBack: () => void }) => {
+const TacticsScreen = ({ gameState, onStrategyChange, onBack }: { gameState: GameState, onStrategyChange: (newStrategy: GameStrategy) => void, onBack: () => void }) => {
     const offensivePlaybooks: OffensivePlaybook[] = ['Balanced', 'Spread', 'Pro-Style', 'Run Heavy', 'Air Raid'];
     const defensivePlaybooks: DefensivePlaybook[] = ['4-3 Defense', '3-4 Defense', 'Nickel', 'Aggressive'];
+
+    const oc = gameState.staff.find(s => s.type === 'OC');
+    const dc = gameState.staff.find(s => s.type === 'DC');
 
     return (
         <ScreenWrapper screenKey="TACTICS">
@@ -391,21 +405,27 @@ const TacticsScreen = ({ strategy, onStrategyChange, onBack }: { strategy: GameS
                  <div>
                      <h3 className="text-xl font-press-start text-yellow-400 mb-4">Offensive Playbook</h3>
                      <div className="grid grid-cols-2 gap-4">
-                         {offensivePlaybooks.map(pb => (
-                             <Button key={pb} onClick={() => onStrategyChange({ ...strategy, offense: pb })} className={strategy.offense === pb ? 'bg-cyan-400 text-black' : ''}>
-                                 {pb}
+                         {offensivePlaybooks.map(pb => {
+                            const isSchemeMatch = oc?.scheme === pb;
+                            return (
+                                <Button key={pb} onClick={() => onStrategyChange({ ...gameState.myStrategy, offense: pb })} className={gameState.myStrategy.offense === pb ? 'bg-cyan-400 text-black' : ''}>
+                                 {pb} {isSchemeMatch && '⭐'}
                              </Button>
-                         ))}
+                            );
+                         })}
                      </div>
                  </div>
                  <div>
                      <h3 className="text-xl font-press-start text-yellow-400 mb-4">Defensive Playbook</h3>
                      <div className="grid grid-cols-2 gap-4">
-                         {defensivePlaybooks.map(pb => (
-                              <Button key={pb} onClick={() => onStrategyChange({ ...strategy, defense: pb })} className={strategy.defense === pb ? 'bg-cyan-400 text-black' : ''}>
-                                 {pb}
+                         {defensivePlaybooks.map(pb => {
+                            const isSchemeMatch = dc?.scheme === pb;
+                            return (
+                              <Button key={pb} onClick={() => onStrategyChange({ ...gameState.myStrategy, defense: pb })} className={gameState.myStrategy.defense === pb ? 'bg-cyan-400 text-black' : ''}>
+                                 {pb} {isSchemeMatch && '⭐'}
                              </Button>
-                         ))}
+                            );
+                         })}
                      </div>
                  </div>
              </div>
@@ -433,6 +453,7 @@ const StaffScreen = ({ gameState, onHire, onBack }: { gameState: GameState, onHi
                                         <>
                                             <p>{member.name}</p>
                                             <p>Rating: <span className={getAttributeColor(member.rating)}>{member.rating}</span></p>
+                                            {member.scheme && <p>Scheme: {member.scheme}</p>}
                                         </>
                                     ) : <p className="text-gray-500">Position Vacant</p>}
                                 </div>
@@ -447,6 +468,7 @@ const StaffScreen = ({ gameState, onHire, onBack }: { gameState: GameState, onHi
                             <div key={staff.id} className="bg-gray-800 p-3">
                                 <p className="font-bold text-lg">{staff.name} ({staff.type})</p>
                                 <p>Rating: <span className={getAttributeColor(staff.rating)}>{staff.rating}</span></p>
+                                {staff.scheme && <p>Scheme: {staff.scheme}</p>}
                                 <p>Salary: <span className="text-green-400">${staff.salary.toLocaleString()}</span></p>
                                 <Button onClick={() => onHire(staff.id)} disabled={gameState.funds < staff.salary} className="mt-2 text-sm p-2">
                                     Hire
@@ -572,20 +594,130 @@ const InboxScreen = ({ gameState, onRead, onDelete, onBack }: { gameState: GameS
     );
 };
 
+const GodModeScreen = ({ gameState, onBack, onUpdateState, godModeUnlocked, setGodModeUnlocked }: { 
+    gameState: GameState, 
+    onBack: () => void, 
+    onUpdateState: (newState: GameState) => void,
+    godModeUnlocked: boolean,
+    setGodModeUnlocked: (unlocked: boolean) => void
+}) => {
+    const [password, setPassword] = React.useState('');
+    const [error, setError] = React.useState(false);
 
-const GodModeScreen = ({ onToggleForceWin, forceWin, onBack }: { onToggleForceWin: () => void, forceWin: boolean, onBack: () => void }) => (
-    <ScreenWrapper screenKey="GOD_MODE">
-        <div className="flex justify-between items-center p-4">
-            <h2 className="text-2xl font-press-start text-cyan-400">God Mode</h2>
-            <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
-        </div>
-        <div className="p-4 pt-0">
-            <Button onClick={onToggleForceWin}>
-                Force Win Next Game: {forceWin ? 'ON' : 'OFF'}
-            </Button>
-        </div>
-    </ScreenWrapper>
-);
+    const handleUnlock = () => {
+        if (password === '102011') {
+            setGodModeUnlocked(true);
+            setError(false);
+        } else {
+            setError(true);
+        }
+    };
+
+    if (!godModeUnlocked) {
+        return (
+            <ScreenWrapper screenKey="GOD_MODE">
+                <div className="flex justify-between items-center p-4">
+                    <h2 className="text-2xl font-press-start text-cyan-400">God Mode</h2>
+                    <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
+                </div>
+                <div className="p-4 max-w-sm mx-auto">
+                    <input 
+                        type="password" 
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className={`bg-gray-800 p-3 w-full mb-4 border-2 ${error ? 'border-red-500' : 'border-gray-700'}`}
+                        placeholder="Enter password"
+                    />
+                    <Button onClick={handleUnlock} className="text-center justify-center">Unlock</Button>
+                    {error && <p className="text-red-500 mt-2 text-center">Incorrect Password.</p>}
+                </div>
+            </ScreenWrapper>
+        );
+    }
+    
+    const handleAddFunds = () => onUpdateState({ ...gameState, funds: gameState.funds + 1000000 });
+    
+    const handleHealTeam = () => {
+        if (!gameState.myTeamId) return;
+        const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
+        const newRoster = myTeam.roster.map(p => ({ ...p, isInjured: 0, currentStamina: 100 }));
+        const newTeams = gameState.teams.map(t => t.id === gameState.myTeamId ? { ...myTeam, roster: newRoster, ovr: GameService.calculateTeamOVR(newRoster) } : t);
+        onUpdateState({ ...gameState, teams: newTeams });
+    };
+
+    const handleBoostTeam = () => {
+        if (!gameState.myTeamId) return;
+        const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
+        const newRoster = myTeam.roster.map(p => {
+            const newAttributes = { ...p.attributes };
+            Object.keys(newAttributes).forEach(key => {
+                const attr = key as keyof typeof newAttributes;
+                if (attr !== 'OVR') {
+                    newAttributes[attr] = 99;
+                }
+            });
+            newAttributes.OVR = 99;
+            return { ...p, attributes: newAttributes };
+        });
+        const newTeams = gameState.teams.map(t => t.id === gameState.myTeamId ? { ...myTeam, roster: newRoster, ovr: 99 } : t);
+        onUpdateState({ ...gameState, teams: newTeams });
+    };
+
+    const handleMaxFacilities = () => {
+        const newFacilities = { ...gameState.facilities };
+        const MAX_LEVEL = 10;
+        (Object.keys(newFacilities) as Array<keyof typeof newFacilities>).forEach(key => {
+            newFacilities[key].level = MAX_LEVEL;
+            newFacilities[key].cost = 99999999;
+        });
+        onUpdateState({ ...gameState, facilities: newFacilities });
+    };
+
+    const handleMaxCoaches = () => {
+        const newStaff = gameState.staff.map(s => ({ ...s, rating: 99 }));
+        onUpdateState({ ...gameState, staff: newStaff });
+    };
+
+    const handleMaxMorale = () => {
+        if (!gameState.myTeamId) return;
+        const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
+        const newRoster = myTeam.roster.map(p => ({ ...p, morale: 100 }));
+        const newTeams = gameState.teams.map(t => t.id === gameState.myTeamId ? { ...myTeam, roster: newRoster } : t);
+        onUpdateState({ ...gameState, teams: newTeams });
+    };
+
+    const handleFixAcademics = () => {
+        if (!gameState.myTeamId) return;
+        const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
+        const newRoster = myTeam.roster.map(p => ({ ...p, gpa: 4.0, isSuspended: false }));
+        const newTeams = gameState.teams.map(t => t.id === gameState.myTeamId ? { ...myTeam, roster: newRoster } : t);
+        onUpdateState({ ...gameState, teams: newTeams });
+    };
+
+    return (
+        <ScreenWrapper screenKey="GOD_MODE">
+            <div className="flex justify-between items-center p-4">
+                <h2 className="text-2xl font-press-start text-cyan-400">God Mode Controls</h2>
+                <Button onClick={onBack} className="w-auto px-4 py-2">Back</Button>
+            </div>
+            <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Button onClick={handleAddFunds} className="text-center justify-center"><DollarIcon className="w-5 h-5 inline mr-2"/>Add $1,000,000</Button>
+                <Button onClick={handleHealTeam} className="text-center justify-center">Heal My Team</Button>
+                <Button onClick={handleBoostTeam} className="text-center justify-center">Boost Team to 99 OVR</Button>
+                <Button onClick={() => onUpdateState({...gameState, forceWinNextGame: !gameState.forceWinNextGame})} className={`text-center justify-center ${gameState.forceWinNextGame ? 'bg-green-600' : ''}`}>
+                    Force Win Next Game: {gameState.forceWinNextGame ? 'ON' : 'OFF'}
+                </Button>
+                <Button onClick={() => onUpdateState({...gameState, fanHappiness: 100})} className="text-center justify-center">Max Fan Happiness</Button>
+                <Button onClick={() => onUpdateState({...gameState, recruitingPoints: 999})} className="text-center justify-center">Max Recruiting Points</Button>
+                <Button onClick={handleMaxFacilities} className="text-center justify-center">Max Facilities</Button>
+                <Button onClick={handleMaxCoaches} className="text-center justify-center">Max Coach Ratings</Button>
+                <Button onClick={handleMaxMorale} className="text-center justify-center">Max Team Morale</Button>
+                <Button onClick={handleFixAcademics} className="text-center justify-center">Fix Team Academics</Button>
+            </div>
+        </ScreenWrapper>
+    );
+};
+
 
 const TrophyCaseScreen = ({ trophies, onBack }: { trophies: Trophy[], onBack: () => void }) => (
     <ScreenWrapper screenKey="TROPHY_CASE">
@@ -697,18 +829,23 @@ const TrainingCampScreen = ({ roster, recruits, funds, onFinish, onSelectProgram
 };
 
 
-const PlayGameScreen = ({ activeGame, myTeam, opponentTeam, onPlay, onSkip }: { activeGame: ActiveGameState, myTeam: Team, opponentTeam: Team, onPlay: (play: OffensivePlay) => void, onSkip: () => void }) => {
+const PlayGameScreen = ({ activeGame, myTeam, opponentTeam, onPlay, onSkip, onContinueOpponentPlay }: { activeGame: ActiveGameState, myTeam: Team, opponentTeam: Team, onPlay: (play: OffensivePlay) => void, onSkip: () => void, onContinueOpponentPlay: () => void }) => {
     const offensivePlays: OffensivePlay[] = ['Inside Run', 'Outside Run', 'Slant', 'Post', 'Screen Pass', 'Play Action'];
+    const momentumWidth = 50 + activeGame.momentum / 2;
+
     return (
         <ScreenWrapper screenKey="PLAY_GAME">
             <div className="p-4">
-                <div className="grid grid-cols-3 text-center mb-4 bg-black/50 p-2 font-press-start">
+                <div className="grid grid-cols-3 text-center mb-2 bg-black/50 p-2 font-press-start">
                     <div className="text-cyan-400">{myTeam.name}: {activeGame.playerScore}</div>
                     <div>Q{activeGame.quarter} - {Math.floor(activeGame.time / 60)}:{String(activeGame.time % 60).padStart(2, '0')}</div>
                     <div className="text-red-400">{opponentTeam.name}: {activeGame.opponentScore}</div>
                 </div>
+                 <div className="w-full bg-red-800 h-2 mb-4 border-2 border-gray-600">
+                    <div className="bg-cyan-400 h-full" style={{ width: `${momentumWidth}%` }}></div>
+                </div>
                  <div className="text-center text-lg font-bold mb-4">
-                    {activeGame.possession === 'player' ? 'Your Possession' : 'Opponent Possession'} - {activeGame.down}{['st','nd','rd','th'][activeGame.down-1]} & {activeGame.distance} at the {activeGame.yardLine > 50 ? 100 - activeGame.yardLine : activeGame.yardLine}
+                    {activeGame.possession === 'player' ? 'Your Possession' : 'Opponent Possession'} - {activeGame.down}{['st','nd','rd','th'][activeGame.down-1] || 'th'} & {activeGame.distance} at the {activeGame.yardLine > 50 ? `Opp ${100 - activeGame.yardLine}` : `Own ${activeGame.yardLine}`}
                 </div>
                 <div className="h-64 overflow-y-auto bg-gray-800/50 p-2 mb-4 border border-gray-700">
                     {activeGame.playLog.map((log, i) => <p key={i}>{log}</p>)}
@@ -719,8 +856,10 @@ const PlayGameScreen = ({ activeGame, myTeam, opponentTeam, onPlay, onSkip }: { 
                         {offensivePlays.map(play => <Button key={play} onClick={() => onPlay(play)} className="text-center justify-center">{play}</Button>)}
                         <Button onClick={() => onPlay('Hail Mary')} className="text-center justify-center border-yellow-500 hover:bg-yellow-500">Hail Mary</Button>
                      </div>
-                ) : <p className="text-center font-press-start">Waiting for Opponent...</p>}
-                 <Button onClick={onSkip} className="mt-4 text-center justify-center">Sim to End</Button>
+                ) : (
+                    <Button onClick={onContinueOpponentPlay} className="text-center justify-center">Continue</Button>
+                )}
+                 <Button onClick={onSkip} className="mt-4 text-center justify-center border-gray-500 hover:bg-gray-600">Sim to End</Button>
             </div>
         </ScreenWrapper>
     );
@@ -741,32 +880,40 @@ const OffseasonModal = ({ awards, onStartRecruiting }: { awards: SeasonAwards, o
     </Modal>
 );
 
-const GameResultModal = ({ result, myTeamName, opponentName, onContinue }: { result: Game['result'], myTeamName: string, opponentName: string, onContinue: () => void }) => {
+const NewspaperClippingModal = ({ result, myTeamName, opponentName, onContinue }: { result: Game['result'], myTeamName: string, opponentName: string, onContinue: () => void }) => {
     if (!result) return null;
-    const didWin = result.myScore > result.opponentScore;
-    
-    const findTopPerformer = (stats: Record<string, Partial<PlayerStats>>) => {
-        let topPlayer: Player | null = null;
-        let topStat = 0;
-        for (const playerId in stats) {
-            const pStats = stats[playerId];
-            const score = (pStats.passYds || 0) / 10 + (pStats.rushYds || 0) / 5 + (pStats.recYds || 0) / 5 + (pStats.passTDs || 0) * 6 + (pStats.rushTDs || 0) * 6 + (pStats.recTDs || 0) * 6;
-            if (score > topStat) {
-                topStat = score;
-                // This part requires access to the roster to get player names.
-                // For now, we'll just show stats. A better implementation would pass the rosters in.
-            }
-        }
-        return "Top Performer Stats here..."; // Placeholder
-    };
 
     return (
-        <Modal size="2xl">
-            <h2 className={`text-3xl font-press-start text-center mb-4 ${didWin ? 'text-green-400' : 'text-red-400'}`}>
-                {didWin ? 'VICTORY' : 'DEFEAT'}
-            </h2>
-            <p className="text-center text-4xl mb-6">{result.myScore} - {result.opponentScore}</p>
-            <Button onClick={onContinue} className="text-center justify-center">Continue</Button>
+        <Modal size="2xl" onClose={onContinue}>
+            <div className="bg-[#FDFBF2] text-black p-6 font-mono border-4 border-black/20" style={{ fontFamily: '"Roboto Mono", monospace' }}>
+                <div className="text-center border-b-2 border-black/20 pb-2 mb-4">
+                    <h1 className="text-xl font-bold uppercase">The High School Gridiron Gazette</h1>
+                    <p className="text-xs">Your Weekly Source for Prep Football Action</p>
+                </div>
+                <h2 className="text-3xl font-bold text-center mb-4 leading-tight" style={{ fontFamily: '"Press Start 2P", cursive' }}>
+                    {result.headline || 'Game Result'}
+                </h2>
+                <div className="flex justify-around items-center text-center my-4 p-2 bg-black/10 rounded">
+                    <div>
+                        <p className="text-sm font-bold">{myTeamName}</p>
+                        <p className="text-4xl font-bold">{result.myScore}</p>
+                    </div>
+                    <p className="text-2xl font-bold">-</p>
+                     <div>
+                        <p className="text-sm font-bold">{opponentName}</p>
+                        <p className="text-4xl font-bold">{result.opponentScore}</p>
+                    </div>
+                </div>
+                <p className="text-base leading-relaxed my-4 text-justify">
+                    {result.newspaperSummary || 'An exciting game was played.'}
+                </p>
+                <button 
+                    onClick={onContinue} 
+                    className="w-full mt-4 p-3 bg-gray-800 text-white font-press-start text-sm uppercase hover:bg-gray-700 transition-colors"
+                >
+                    Continue
+                </button>
+            </div>
         </Modal>
     );
 };
@@ -791,6 +938,7 @@ const App = () => {
     const [modal, setModal] = React.useState<{type: 'gameSummary' | 'scoutingReport', game: Game, opponent: Team} | null>(null);
     const [signedRecruits, setSignedRecruits] = React.useState<Recruit[]>([]);
     const [trainingSelections, setTrainingSelections] = React.useState<Record<string, TrainingProgram>>({});
+    const [godModeUnlocked, setGodModeUnlocked] = React.useState(false);
 
     React.useEffect(() => {
         const savedState = localStorage.getItem('footballGameState');
@@ -816,71 +964,76 @@ const App = () => {
         }, 500);
     };
 
-    const handleAdvanceWeek = () => {
+    const handleAdvanceWeek = async () => {
         if (!gameState || !gameState.myTeamId) return;
         setLoading("Simulating week...");
+        
+        // Short delay for loader UX
+        await new Promise(r => setTimeout(r, 200));
 
-        setTimeout(() => {
-            let updatedState = JSON.parse(JSON.stringify(gameState));
-            const myTeam = updatedState.teams.find((t: Team) => t.id === updatedState.myTeamId)!;
+        let updatedState = JSON.parse(JSON.stringify(gameState));
+        const myTeam = updatedState.teams.find((t: Team) => t.id === updatedState.myTeamId)!;
 
-            // Restore stamina for my team
-            myTeam.roster.forEach((p: Player) => {
-                const trainer = updatedState.staff.find((s: Staff) => s.type === 'Trainer');
-                const recoveryRate = 70 + (trainer ? trainer.rating / 10 : 0);
-                // FIX: Use exported 'rand' function from GameService to resolve 'rand is not defined' error.
-                p.currentStamina = Math.min(100, p.currentStamina + GameService.rand(recoveryRate-10, recoveryRate+10));
-                if (p.isInjured > 0) p.isInjured--;
-            });
+        // Restore stamina for my team
+        myTeam.roster.forEach((p: Player) => {
+            const trainer = updatedState.staff.find((s: Staff) => s.type === 'Trainer');
+            const recoveryRate = 70 + (trainer ? trainer.rating / 10 : 0);
+            // FIX: Use exported 'rand' function from GameService to resolve 'rand is not defined' error.
+            p.currentStamina = Math.min(100, p.currentStamina + GameService.rand(recoveryRate-10, recoveryRate+10));
+            if (p.isInjured > 0) p.isInjured--;
+        });
 
-            const nextGame = updatedState.schedule[myTeam.id].find((g: Game) => g.week === updatedState.week);
-            
-            if (!nextGame) { // End of regular season
-                const isPlayoffTeam = updatedState.nationalRankings.slice(0, 8).some((t: { teamId: number }) => t.teamId === myTeam.id);
-                if (!isPlayoffTeam) {
-                    updatedState = GameService.startOffseason(updatedState);
-                } else {
-                    updatedState.week++; // Move to playoffs
-                }
+        const { newState: stateAfterAcademics, messages: academicMessages } = GameService.runWeeklyAcademicCheck(updatedState);
+        updatedState = stateAfterAcademics;
+        updatedState.inbox.push(...academicMessages);
+
+        const nextGame = updatedState.schedule[myTeam.id].find((g: Game) => g.week === updatedState.week);
+        
+        if (!nextGame) { // End of regular season
+            const isPlayoffTeam = updatedState.nationalRankings.slice(0, 8).some((t: { teamId: number }) => t.teamId === myTeam.id);
+            if (!isPlayoffTeam) {
+                updatedState = GameService.startOffseason(updatedState);
             } else {
-                const opponent = updatedState.teams.find((t: Team) => t.id === nextGame.opponentId)!;
-                const gameResult = GameService.simulateGame(myTeam, opponent, updatedState.myStrategy, {offense: 'Balanced', defense: '4-3 Defense'}, updatedState.facilities, {level: 1, cost: 0}, nextGame.weather || 'Sunny', updatedState.forceWinNextGame, updatedState.staff);
-                
-                GameService.applyGameResults(updatedState, myTeam, opponent, gameResult);
-                
-                if (updatedState.week < 13) {
-                     updatedState.week++;
-                }
-               
-                updatedState = GameService.simulateOtherGames(updatedState);
-                updatedState.nationalRankings = GameService.updateRankings(updatedState.teams);
-
-                if (updatedState.week > 10) {
-                     const isEliminated = GameService.updatePlayoffBracket(updatedState, myTeam.id, opponent.id, gameResult.didWin);
-                     if(isEliminated) {
-                         updatedState = GameService.startOffseason(updatedState);
-                     } else if (updatedState.week === 14) { // Won championship
-                         updatedState.trophyCase.push({ season: updatedState.season, award: 'National Champions' });
-                         updatedState = GameService.startOffseason(updatedState);
-                     }
-                }
+                updatedState.week++; // Move to playoffs
             }
+        } else {
+            const opponent = updatedState.teams.find((t: Team) => t.id === nextGame.opponentId)!;
+            const gameResult = await GameService.simulateGame(myTeam, opponent, updatedState.myStrategy, {offense: 'Balanced', defense: '4-3 Defense'}, updatedState.facilities, {level: 1, cost: 0}, nextGame.weather || 'Sunny', updatedState.forceWinNextGame, updatedState.staff);
             
-            // Add new inbox messages
-            const newMessages = GameService.generateWeeklyInbox(updatedState);
-            updatedState.inbox.push(...newMessages);
-            if (updatedState.forceWinNextGame) updatedState.forceWinNextGame = false;
+            GameService.applyGameResults(updatedState, myTeam, opponent, gameResult);
+            
+            if (updatedState.week < 13) {
+                 updatedState.week++;
+            }
+           
+            updatedState = await GameService.simulateOtherGames(updatedState);
+            updatedState.nationalRankings = GameService.updateRankings(updatedState.teams);
 
-            setGameState(updatedState);
-            setLoading(null);
-        }, 500);
+            if (updatedState.week > 10) {
+                 const isEliminated = GameService.updatePlayoffBracket(updatedState, myTeam.id, opponent.id, gameResult.myScore > gameResult.opponentScore);
+                 if(isEliminated) {
+                     updatedState = GameService.startOffseason(updatedState);
+                 } else if (updatedState.week === 14) { // Won championship
+                     updatedState.trophyCase.push({ season: updatedState.season, award: 'National Champions' });
+                     updatedState = GameService.startOffseason(updatedState);
+                 }
+            }
+        }
+        
+        // Add new inbox messages
+        const newMessages = GameService.generateWeeklyInbox(updatedState);
+        updatedState.inbox.push(...newMessages);
+        if (updatedState.forceWinNextGame) updatedState.forceWinNextGame = false;
+
+        setGameState(updatedState);
+        setLoading(null);
     };
 
     const handlePlayGame = (game: Game, opponent: Team) => {
          if (!gameState) return;
          setGameState({ ...gameState, activeGame: {
             quarter: 1, time: 900, down: 1, distance: 10, yardLine: 25, possession: 'player',
-            playerScore: 0, opponentScore: 0, gameId: `${game.week}-${game.opponentId}`, opponentId: opponent.id, playLog: ["Game Start!"], isGameOver: false
+            playerScore: 0, opponentScore: 0, gameId: `${game.week}-${game.opponentId}`, opponentId: opponent.id, playLog: ["Game Start!"], isGameOver: false, momentum: 0,
          }});
          setScreen('PLAY_GAME');
     };
@@ -893,81 +1046,89 @@ const App = () => {
         }
     };
     
+    // --- REVAMPED PLAYABLE GAME LOGIC ---
+
+    const processPlay = (updatedGame: ActiveGameState) => {
+        if (updatedGame.time <= 0 && updatedGame.quarter < 4) {
+            updatedGame.quarter++;
+            updatedGame.time = 900;
+            updatedGame.playLog = [`Start of Quarter ${updatedGame.quarter}`, ...updatedGame.playLog];
+        }
+
+        if (updatedGame.quarter >= 4 && updatedGame.time <= 0) {
+            updatedGame.isGameOver = true;
+        }
+
+        setGameState(gs => ({...gs!, activeGame: updatedGame}));
+    };
+
     const handlePlayAction = (play: OffensivePlay) => {
         if (!gameState?.activeGame || !gameState.myTeamId) return;
-        let activeGame = { ...gameState.activeGame };
         const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
-        const opponent = gameState.teams.find(t => t.id === activeGame.opponentId)!;
+        const opponent = gameState.teams.find(t => t.id === gameState.activeGame.opponentId)!;
 
-        // Player's Turn
-        const outcome = GameService.simulatePlay(myTeam, opponent, play, activeGame.yardLine, gameState.staff);
-        activeGame.playLog = [outcome.description, ...activeGame.playLog];
-        // FIX: Use exported 'rand' function from GameService to resolve 'rand is not defined' error.
-        activeGame.time -= GameService.rand(25, 40);
-
-        if (outcome.isTouchdown) {
-            activeGame.playerScore += 7;
-            activeGame.possession = 'opponent';
-            activeGame.yardLine = 25;
-            activeGame.down = 1;
-            activeGame.distance = 10;
-        } else if (outcome.isTurnover) {
-            activeGame.possession = 'opponent';
-            activeGame.yardLine = 100 - (activeGame.yardLine + outcome.yards);
-        } else if (!outcome.isComplete) {
-            activeGame.down += 1;
-        } else {
-            activeGame.yardLine += outcome.yards;
-            activeGame.distance -= outcome.yards;
-        }
-
-        if (activeGame.distance <= 0) {
-            activeGame.down = 1;
-            activeGame.distance = 10;
-        }
-        if (activeGame.down > 4) {
-            activeGame.possession = 'opponent';
-            activeGame.yardLine = 100 - activeGame.yardLine;
-            activeGame.down = 1;
-            activeGame.distance = 10;
-        }
-
-        // Opponent's Turn
-        const oppDrive = GameService.simulateOpponentDrive(myTeam, opponent);
-        activeGame.opponentScore += oppDrive.score;
-        activeGame.time -= oppDrive.timeElapsed;
-        activeGame.playLog = [oppDrive.description, ...activeGame.playLog];
-        activeGame.possession = 'player';
-        activeGame.yardLine = 25;
-        activeGame.down = 1;
-        activeGame.distance = 10;
-        
-        if(activeGame.time <= 0 && activeGame.quarter < 4) {
-            activeGame.quarter++;
-            activeGame.time = 900;
-        }
-        
-        if (activeGame.quarter > 4 || (activeGame.quarter === 4 && activeGame.time <= 0)) {
-            activeGame.isGameOver = true;
-        }
-
-
-        setGameState({...gameState, activeGame});
+        const outcome = GameService.determinePlayerPlayOutcome(myTeam, opponent, play, gameState.activeGame, gameState.staff);
+        const nextGameState = GameService.updateGameAfterPlay(gameState.activeGame, outcome);
+        processPlay(nextGameState);
     };
     
-    const handleSkipGame = () => {
-         if (!gameState?.activeGame) return;
-         const finalState = GameService.skipGameSimulation(gameState);
-         setGameState({...gameState, activeGame: finalState});
+    const handleContinueForOpponent = () => {
+        if (!gameState?.activeGame || !gameState.myTeamId) return;
+        setLoading("Opponent's turn...");
+        
+        // Short delay for UX
+        setTimeout(() => {
+            const myTeam = gameState.teams.find(t => t.id === gameState.myTeamId)!;
+            const opponent = gameState.teams.find(t => t.id === gameState.activeGame.opponentId)!;
+
+            const outcome = GameService.determineOpponentPlayOutcome(myTeam, opponent, gameState.activeGame);
+            const nextGameState = GameService.updateGameAfterPlay(gameState.activeGame, outcome);
+            processPlay(nextGameState);
+            setLoading(null);
+        }, 750);
     };
 
-    const handleFinishPlayableGame = () => {
+    const handleEndPlayableGame = async () => {
         if (!gameState?.activeGame) return;
-        const finalStats: Record<string, Partial<PlayerStats>> = {}; // Simplified for now
-        const newState = GameService.applyPlayableGameResults(gameState, gameState.activeGame, finalStats);
-        setGameState(newState);
+        setLoading("Finalizing game...");
+        await new Promise(r => setTimeout(r, 200));
+
+        const finalState = await GameService.endPlayableGame(gameState);
+        setGameState(finalState);
         setScreen('MAIN_MENU');
+        setLoading(null);
     };
+    
+    const handleSkipGame = async () => {
+         if (!gameState || !gameState.myTeamId) return;
+        setLoading("Simulating to end...");
+        await new Promise(r => setTimeout(r, 200));
+
+        // This function now behaves identically to handleAdvanceWeek but for the current game
+        // This ensures records and scores are processed by the same reliable logic.
+        let updatedState = JSON.parse(JSON.stringify(gameState));
+        const myTeam = updatedState.teams.find((t: Team) => t.id === updatedState.myTeamId)!;
+        const nextGame = updatedState.schedule[myTeam.id].find((g: Game) => g.week === updatedState.week)!;
+        const opponent = updatedState.teams.find((t: Team) => t.id === nextGame.opponentId)!;
+        
+        const gameResult = await GameService.simulateGame(myTeam, opponent, updatedState.myStrategy, {offense: 'Balanced', defense: '4-3 Defense'}, updatedState.facilities, {level: 1, cost: 0}, nextGame.weather || 'Sunny', updatedState.forceWinNextGame, updatedState.staff);
+        
+        GameService.applyGameResults(updatedState, myTeam, opponent, gameResult);
+            
+        if (updatedState.week < 13) updatedState.week++;
+    
+        updatedState = await GameService.simulateOtherGames(updatedState);
+        updatedState.nationalRankings = GameService.updateRankings(updatedState.teams);
+        if (updatedState.forceWinNextGame) updatedState.forceWinNextGame = false;
+        updatedState.activeGame = null; // Ensure active game is cleared
+
+        setGameState(updatedState);
+        setScreen('MAIN_MENU');
+        setLoading(null);
+    };
+
+    // --- END REVAMPED LOGIC ---
+
 
     const handleUpgradeFacility = (facility: keyof GameState['facilities']) => {
         if (!gameState) return;
@@ -1061,21 +1222,21 @@ const App = () => {
             case 'STANDINGS': return <StandingsScreen teams={gameState.teams} rankings={gameState.nationalRankings} myTeamId={myTeam.id} onBack={() => setScreen('MAIN_MENU')} />;
             case 'NATIONAL_STATS': return <NationalStatsScreen teams={gameState.teams} onBack={() => setScreen('MAIN_MENU')} />;
             case 'FACILITIES': return <FacilitiesScreen facilities={gameState.facilities} funds={gameState.funds} onUpgrade={handleUpgradeFacility} onBack={() => setScreen('MAIN_MENU')} />;
-            case 'TACTICS': return <TacticsScreen strategy={gameState.myStrategy} onStrategyChange={(s) => setGameState({...gameState, myStrategy: s})} onBack={() => setScreen('MAIN_MENU')} />;
+            case 'TACTICS': return <TacticsScreen gameState={gameState} onStrategyChange={(s) => setGameState({...gameState, myStrategy: s})} onBack={() => setScreen('MAIN_MENU')} />;
             case 'STAFF': return <StaffScreen gameState={gameState} onHire={handleHireStaff} onBack={() => setScreen('MAIN_MENU')} />;
             case 'SPONSORS': return <SponsorsScreen gameState={gameState} onSelect={handleSelectSponsor} onBack={() => setScreen('MAIN_MENU')} />;
             case 'AWARD_RACES': return <AwardRacesScreen gameState={gameState} onBack={() => setScreen('MAIN_MENU')} />;
             case 'TROPHY_CASE': return <TrophyCaseScreen trophies={gameState.trophyCase} onBack={() => setScreen('MAIN_MENU')} />;
             case 'INBOX': return <InboxScreen gameState={gameState} onRead={handleMessageRead} onDelete={handleMessageDelete} onBack={() => setScreen('MAIN_MENU')} />;
-            case 'GOD_MODE': return <GodModeScreen onToggleForceWin={() => setGameState({...gameState, forceWinNextGame: !gameState.forceWinNextGame})} forceWin={gameState.forceWinNextGame} onBack={() => setScreen('MAIN_MENU')} />;
+            case 'GOD_MODE': return <GodModeScreen gameState={gameState} onBack={() => setScreen('MAIN_MENU')} onUpdateState={setGameState} godModeUnlocked={godModeUnlocked} setGodModeUnlocked={setGodModeUnlocked} />;
             case 'RECRUITMENT': return <RecruitmentScreen recruits={gameState.recruits} recruitingPoints={gameState.recruitingPoints} onSign={handleSignRecruit} onFinish={handleFinishRecruiting} signedRecruits={signedRecruits} />;
             case 'TRAINING_CAMP': return <TrainingCampScreen roster={myTeam.roster} recruits={signedRecruits} funds={gameState.funds} onFinish={handleFinishTraining} onSelectProgram={handleTrainingSelection} selections={trainingSelections} />;
             case 'PLAY_GAME':
                 if (gameState.activeGame?.isGameOver) {
-                    return <Button onClick={handleFinishPlayableGame} className="text-center justify-center m-8">Game Over! View Results</Button>
+                    return <Button onClick={handleEndPlayableGame} className="text-center justify-center m-8">Game Over! View Results</Button>
                 }
-                return gameState.activeGame ? <PlayGameScreen activeGame={gameState.activeGame} myTeam={myTeam} opponentTeam={gameState.teams.find(t => t.id === gameState.activeGame?.opponentId)!} onPlay={handlePlayAction} onSkip={handleSkipGame} /> : <div>No Active Game</div>;
-            case 'GAME_OVER': return <GameOverScreen season={gameState.season} onRestart={() => setGameState(null)} />;
+                return gameState.activeGame ? <PlayGameScreen activeGame={gameState.activeGame} myTeam={myTeam} opponentTeam={gameState.teams.find(t => t.id === gameState.activeGame?.opponentId)!} onPlay={handlePlayAction} onSkip={handleSkipGame} onContinueOpponentPlay={handleContinueForOpponent} /> : <div>No Active Game</div>;
+            case 'GAME_OVER': return <GameOverScreen season={gameState.season} onRestart={() => { setGameState(null); setScreen('TEAM_SELECTION'); }} />;
             case 'MAIN_MENU':
             default:
                 const nextOpponentId = GameService.findNextOpponentId(gameState);
@@ -1091,7 +1252,7 @@ const App = () => {
                              <p className="text-sm text-gray-400 mt-1">Overall: {myTeam.ovr}</p>
                         </div>
                         <MainMenu onNavigate={setScreen} unreadMessages={unreadMessages} />
-                        {gameState.lastGameResult && <GameResultModal result={gameState.lastGameResult} myTeamName={myTeam.name} opponentName={gameState.teams.find(t => t.id === gameState.lastGameResult?.opponentId)?.name || ''} onContinue={() => setGameState({...gameState, lastGameResult: null})} />}
+                        {gameState.lastGameResult && <NewspaperClippingModal result={gameState.lastGameResult} myTeamName={myTeam.name} opponentName={gameState.teams.find(t => t.id === gameState.lastGameResult?.opponentId)?.name || ''} onContinue={() => setGameState({...gameState, lastGameResult: null})} />}
                         <div className="p-4">
                             {nextOpponent && nextGame ? (
                                 <>
