@@ -508,7 +508,7 @@ export const updateRankings = (teams: Team[]): { teamId: number; rank: number }[
     return sortedTeams.map((team, i) => ({ teamId: team.id, rank: i + 1 }));
 };
 
-export const getNationalLeaders = (teams: Team[]): Record<string, unknown> => {
+export const getNationalLeaders = (teams: Team[]): Record<string, Player[]> => {
     const allPlayers = teams.flatMap(t => t.roster);
     const leaders: Record<string, Player[]> = {
         passYds: [...allPlayers].sort((a, b) => b.seasonStats.passYds - a.seasonStats.passYds).slice(0, 5),
@@ -697,7 +697,7 @@ export const generateScoutingReport = (team: Team): { strengths: string[], weakn
     return { strengths, weaknesses, keyPlayers };
 };
 
-export const calculateAwardRaces = (teams: Team[]): Record<string, unknown> => {
+export const calculateAwardRaces = (teams: Team[]): Record<string, { player: Player; teamName: string; }[]> => {
     // FIX: Corrected logic to properly map players to their team names, resolving a type error comparing player string ID to team number ID.
     const allPlayers = teams.flatMap(t =>
         t.roster.map(player => ({ player, teamName: t.name }))
