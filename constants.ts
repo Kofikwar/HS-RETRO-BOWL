@@ -1,51 +1,62 @@
 
 
-import { Team } from './types';
 
-export const MAX_SEASONS = 30;
+import { WVClass } from './types';
 
-export const POWERHOUSE_TEAMS: Pick<Team, 'id' | 'name'>[] = [
-  { id: 1, name: "IMG Academy (FL)" },
-  { id: 2, name: "Mater Dei (CA)" },
-  { id: 3, name: "St. John Bosco (CA)" },
-  { id: 4, name: "American Heritage (FL)" },
-  { id: 5, name: "Duncanville (TX)" },
-  { id: 6, name: "North Shore (TX)" },
-  { id: 7, name: "Bishop Gorman (NV)" },
-  { id: 8, name: "St. Frances Academy (MD)" },
-  { id: 9, name: "Buford (GA)" },
-  { id: 10, name: "Central (Miami, FL)" },
-  { id: 11, name: "Westlake (TX)" },
-  { id: 12, name: "De La Salle (CA)" },
-  { id: 13, name: "St. Thomas Aquinas (FL)" },
-  { id: 14, name: "Lake Travis (TX)" },
-  { id: 15, name: "Chandler (AZ)" },
-  { id: 16, name: "Allen (TX)" },
-  { id: 17, name: "Trinity Christian (TX)" },
-  { id: 18, name: "Pickerington Central (OH)" },
-  { id: 19, name: "Catholic League (LA)" },
-  { id: 20, name: "Bergen Catholic (NJ)" }
+export const WV_TEAMS: { [key in WVClass]: { id: number; name: string }[] } = {
+  'AAA': [
+    { id: 1, name: "Martinsburg Bulldogs" },
+    { id: 2, name: "Huntington Highlanders" },
+    { id: 3, name: "Cabell Midland Knights" },
+    { id: 4, name: "Parkersburg South Patriots" },
+    { id: 5, name: "George Washington Patriots" },
+    { id: 6, name: "Wheeling Park Patriots" },
+    { id: 7, name: "Capital Cougars" },
+    { id: 8, name: "Morgantown Mohigans" },
+    { id: 9, name: "Spring Valley Timberwolves" },
+    { id: 10, name: "University Hawks" },
+    { id: 11, name: "Parkersburg Big Reds"},
+  ],
+  'AA': [
+    { id: 101, name: "Fairmont Senior Polar Bears" },
+    { id: 102, name: "Bluefield Beavers" },
+    { id: 103, name: "Poca Dots" },
+    { id: 104, name: "North Marion Huskies" },
+    { id: 105, name: "Bridgeport Indians" },
+    { id: 106, name: "Keyser Golden Tornado" },
+    { id: 107, name: "Robert C. Byrd Eagles" },
+    { id: 108, name: "Oak Glen Golden Bears" },
+    { id: 109, name: "Winfield Generals" },
+    { id: 110, name: "Herbert Hoover Huskies" },
+  ],
+  'A': [
+    { id: 201, name: "Williamstown Yellowjackets" },
+    { id: 202, name: "St. Marys Blue Devils" },
+    { id: 203, name: "Wheeling Central Maroon Knights" },
+    { id: 204, name: "Doddridge County Bulldogs" },
+    { id: 205, name: "Greenbrier West Cavaliers" },
+    { id: 206, name: "Tug Valley Panthers" },
+    { id: 207, name: "Ritchie County Rebels" },
+    { id: 208, name: "Mount View Golden Knights" },
+    { id: 209, name: "Tolsia Rebels" },
+    { id: 210, name: "Madonna Blue Dons" },
+  ],
+};
+
+export const RIVALRIES: Record<number, number> = {
+  201: 202, // Williamstown vs St. Marys
+  4: 11, // P-South vs PHS (Parkersburg High)
+  11: 4, // PHS vs P-South
+};
+
+export const POWERHOUSE_TEAMS: number[] = [1, 2, 3, 101, 102, 201, 203]; // Martinsburg, Huntington, Cabell Midland, Fairmont Sr, Bluefield, Williamstown, Wheeling Central
+
+export const OTHER_WV_TEAM_NAMES: string[] = [
+  "John Marshall Monarchs", "Brooke Bruins", "Princeton Tigers",
+  "Point Pleasant Big Blacks", "Wayne Pioneers", "Sissonville Indians", "Nicholas County Grizzlies",
+  "Independence Patriots", "Shady Spring Tigers", "Frankfort Falcons", "Grafton Bearcats",
+  "East Hardy Cougars", "Pendleton County Wildcats", "Moorefield Yellow Jackets", "South Harrison Hawks"
 ];
-
-export const OTHER_TEAM_NAMES: string[] = [
-  "Oak Ridge Pioneers", "Seminole Warhawks", "Apopka Blue Darters", "Dr. Phillips Panthers", "Jones Fightin' Tigers",
-  "Hoover Buccaneers", "Thompson Warriors", "Colquitt County Packers", "Grayson Rams", "Lowndes Vikings",
-  "Katy Tigers", "Guyer Wildcats", "Southlake Carroll Dragons", "Cedar Hill Longhorns", "Atascocita Eagles",
-  "Corner Canyon Chargers", "Skyridge Falcons", "Timpview Thunderbirds", "Bingham Miners", "Lone Peak Knights",
-  "Centennial Huskies", "Servite Friars", "Mission Viejo Diablos", "Sierra Canyon Trailblazers", "Serra Cavaliers",
-  "St. Xavier Bombers", "Lakota West Firebirds", "Archbishop Moeller Crusaders", "St. Edward Eagles", "Massillon Tigers",
-  "Dutch Fork Silver Foxes", "Gaffney Indians", "Fort Dorchester Patriots", "T.L. Hanna Yellow Jackets", "Byrnes Rebels",
-  "Male Bulldogs", "Trinity Shamrocks", "Frederick Douglass Broncos", "Boyle County Rebels", "St. Xavier Tigers",
-  "Center Grove Trojans", "Cathedral Fighting Irish", "Westfield Shamrocks", "Carmel Greyhounds", "Brownsburg Bulldogs",
-  "Bixby Spartans", "Jenks Trojans", "Owasso Rams", "Booker T. Washington Hornets", "Union Redhawks",
-  "Chaminade-Madonna Lions", "Jesuit Tigers", "Venice Indians", "Cardinal Gibbons Chiefs", "Edgewater Eagles",
-  "Milton Eagles", "Collins Hill Eagles", "Lee County Trojans", "Warner Robins Demons", "Cartersville Hurricanes",
-  "Oakland Patriots", "Maryville Rebels", "Alcoa Tornadoes", "Lipscomb Academy Mustangs", "Ravenwood Raptors",
-  "Northwestern Bulls", "Columbus Explorers", "Dillard Panthers", "Booker T. Washington Tornadoes", "Miami Palmetto Panthers",
-  "Cass Tech Technicians", "Belleville Tigers", "West Bloomfield Lakers", "De La Salle Collegiate Pilots", "Rockford Rams",
-  "Cherry Creek Bruins", "Valor Christian Eagles", "Grandview Wolves", "Ralston Valley Mustangs", "Columbine Rebels"
-];
-
 
 export const FIRST_NAMES: string[] = [
   "Michael", "Chris", "Matt", "David", "James", "John", "Robert", "Daniel", "William", "Anthony",

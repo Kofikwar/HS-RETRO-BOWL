@@ -1,11 +1,14 @@
 
 
+
+
 export type PlayerTrait = 'Clutch' | 'Injury Prone' | 'Team Captain' | 'Workhorse';
 
 export interface PlayerStats {
   gamesPlayed: number;
   passYds: number;
   passTDs: number;
+
   rushYds: number;
   rushTDs: number;
   recYds: number;
@@ -13,6 +16,17 @@ export interface PlayerStats {
   tackles: number;
   sacks: number;
   ints: number;
+}
+
+export interface PlayerGoal {
+    description: string;
+    stat: keyof Omit<PlayerStats, 'gamesPlayed'>;
+    target: number;
+    reward: {
+        attribute: keyof Player['attributes'];
+        points: number;
+    };
+    isCompleted: boolean;
 }
 
 export interface Player {
@@ -39,15 +53,30 @@ export interface Player {
   currentStamina: number; // 0-100
   traits: PlayerTrait[];
   gpa: number;
-  isSuspended: boolean;
+  isSuspended: number; // Games remaining on suspension
+  stringer: number; // 1 for starter, 2 for backup, etc.
+  // MyCareer specific fields
+  isPlayerCharacter?: boolean;
+  xp?: number;
+  xpToNextLevel?: number;
+  skillPoints?: number;
+  archetype?: string;
+  coachRelationship?: number; // 0-100
+  collegeOffers?: any[]; // Simplified for now
+  isOnProbation?: boolean;
+  disciplinarySuspension?: number; // Games remaining
+  goals?: PlayerGoal[];
 }
 
 export type Position = 'QB' | 'RB' | 'WR' | 'TE' | 'OL' | 'DL' | 'LB' | 'DB' | 'K/P';
 
-export interface Recruit extends Omit<Player, 'year' | 'careerStats' | 'isInjured' | 'seasonStats' | 'morale' | 'currentStamina' | 'isSuspended'> {
+export interface Recruit extends Omit<Player, 'year' | 'careerStats' | 'isInjured' | 'seasonStats' | 'morale' | 'currentStamina' | 'isSuspended' | 'stringer'> {
   cost: number;
+  starRating: number;
+  blurb: string;
 }
 
+export type WVClass = 'A' | 'AA' | 'AAA';
 export interface Team {
   id: number;
   name: string;
@@ -56,6 +85,8 @@ export interface Team {
   record: { wins: number; losses: number; };
   confRecord: { wins: number; losses: number; };
   rivalId?: number;
+  class: WVClass;
+  prestige: number; // 0-100
 }
 
 export interface Game {
@@ -76,7 +107,7 @@ export interface Game {
       opponentTeam: Record<string, Partial<PlayerStats>>;
     };
   };
-  playoffRound?: 'Quarterfinals' | 'Semifinals' | 'Championship';
+  playoffRound?: 'Quarterfinals' | 'Semifinals' | 'Championship' | 'ToC Semifinal' | 'ToC Final';
 }
 
 export type OffensivePlaybook = 'Balanced' | 'Spread' | 'Pro-Style' | 'Run Heavy' | 'Air Raid';
@@ -109,15 +140,11 @@ export type PlayoffMatchup = {
 
 export interface SeasonAwards {
     mvp: Player | null;
-    allAmerican: Player[];
     bestQB: Player | null;
     bestRB: Player | null;
     bestWR: Player | null;
-    bestTE: Player | null;
+    bestDefender: Player | null;
     bestOL: Player | null;
-    bestDL: Player | null;
-    bestLB: Player | null;
-    bestDB: Player | null;
     bestKP: Player | null;
 }
 
@@ -138,6 +165,11 @@ export interface InboxMessage {
     subject: string;
     body: string;
     read: boolean;
+    offerDetails?: {
+        fromTeamId: number;
+        newTeamId: number;
+        type: 'COACH_OFFER' | 'PLAYER_OFFER';
+    };
 }
 
 export interface Staff {
@@ -187,11 +219,111 @@ export interface PlayOutcome {
     newMomentum: number;
 }
 
+export interface CoachSkill {
+    name: string;
+    description: string;
+    level: number;
+    maxLevel: number;
+    cost: number[]; // cost for each level
+}
+
+export type CoachSkillTree = Record<string, CoachSkill>;
+
+export interface Coach {
+  name: string;
+  archetype: 'Motivator' | 'Strategist' | 'Recruiter';
+  points: number;
+  skillTree: CoachSkillTree;
+  championships: number;
+  totalWins: number;
+  seasonsCoached: number;
+}
+
+export interface GodModeState {
+    isEnabled: boolean;
+    unlimitedFunds: boolean;
+    maxFacilities: boolean;
+    perfectAcademics: boolean;
+    perfectMorale: boolean;
+    maxCoaching: boolean;
+    perfectRecruiting: boolean;
+    forceWinGames: boolean;
+    unlimitedStamina: boolean;
+    infiniteSkillPoints: boolean;
+    // New detailed controls
+    canEditPlayers: boolean;
+    canTransferAnytime: boolean; // MyCareer
+    autoCrazyStats: boolean; // MyCareer
+    autoStart: boolean; // MyCareer
+    maxAllTeamOvr: boolean;
+}
+
+export interface HallOfFameInductee {
+    type: 'Player' | 'Coach' | 'Team';
+    yearInductcted: number;
+    details: PlayerHOFDetails | CoachHOFDetails | TeamHOFDetails;
+}
+
+export interface PlayerHOFDetails {
+    playerId: string;
+    name: string;
+    position: Position;
+    careerStats: PlayerStats;
+}
+
+export interface CoachHOFDetails {
+    name: string;
+    championships: number;
+    totalWins: number;
+}
+
+export interface TeamHOFDetails {
+    teamId: number;
+    teamName: string;
+    season: number;
+    record: { wins: number; losses: number; };
+    accolade: string; // e.g., "Undefeated Season"
+}
+
+export interface ScoutingReport {
+    teamId: number;
+    teamName: string;
+    ovr: number;
+    record: { wins: number; losses: number };
+    bestPlayers: Player[];
+    strategy: GameStrategy;
+    tactic: {
+        strength: string;
+        weakness: string;
+        suggestion: string;
+    };
+}
+
+// FIX: Changed 'interface' to 'type' as an interface cannot be a union type.
+export type TrainingFocus = 'Passing Offense' | 'Rushing Offense' | 'Pass Defense' | 'Rush Defense' | 'Special Teams';
+
+export interface NewsArticle {
+    id: string;
+    week: number;
+    season: number;
+    headline: string;
+    body: string;
+}
+
+export interface CollegeOffer {
+    collegeName: string;
+    division: 'D1-FBS' | 'D1-FCS' | 'D2';
+    prestige: number; // 1-100
+}
+
+
 export interface GameState {
+  gameMode: 'DYNASTY' | 'MY_CAREER' | null;
   myTeamId: number | null;
+  myPlayerId: string | null;
   teams: Team[];
   season: number;
-  week: number; // 1-10 regular season, 11-13 playoffs
+  week: number; // 1-10 reg, 11-13 playoffs, 14-15 ToC, 16 Awards, 17 Training, 18 Recruiting
   schedule: Record<number, Game[]>; // teamId -> schedule
   funds: number;
   facilities: {
@@ -201,10 +333,14 @@ export interface GameState {
     tutoring: { level: number; cost: number };
   };
   nationalRankings: { teamId: number; rank: number }[];
-  playoffBracket: { round: number; matchups: PlayoffMatchup[] }[] | null;
+  playoffBracket: Record<WVClass, PlayoffMatchup[]> | null;
+  tocBracket: PlayoffMatchup[] | null;
+  classChampions: Record<WVClass, number | null>;
+  tocChampion: number | null;
   lastGameResult: Game['result'] | null;
   gameLog: string[];
   recruits: Recruit[];
+  signedRecruits: Recruit[];
   isOffseason: boolean;
   seasonAwards: SeasonAwards;
   // New detailed features
@@ -217,8 +353,14 @@ export interface GameState {
   myStrategy: GameStrategy;
   trophyCase: Trophy[];
   recruitingPoints: number;
+  coach: Coach;
+  schoolPrestige: number; // 0-100
+  hallOfFame: HallOfFameInductee[];
+  practiceSessions: number; // MyCareer weekly practice limit
+  news: NewsArticle[];
+  collegeOffers: CollegeOffer[];
   // God Mode flag
-  forceWinNextGame: boolean;
+  godMode: GodModeState | null;
   activeGame: ActiveGameState | null;
 }
 
@@ -246,4 +388,21 @@ export type Screen =
   | 'TROPHY_CASE'
   | 'TRAINING_CAMP'
   | 'AWARD_RACES'
-  | 'STAFF';
+  | 'STAFF'
+  | 'HALL_OF_FAME'
+  | 'NEWS'
+  | 'PLAYOFFS_HUB'
+  | 'CAREER_OVER'
+  // New Screens
+  | 'MODE_SELECTION'
+  | 'MY_CAREER_CREATION'
+  | 'MY_CAREER_HUB'
+  | 'PRACTICE'
+  | 'DEPTH_CHART'
+  | 'TEAM_PROFILE_HUB'
+  | 'COACH_HUB'
+  | 'GOD_MODE_SETTINGS'
+  | 'TRANSFER_SELECTION'
+  | 'TEAM_STATS'
+  | 'DYNASTY_OVER'
+  | 'MY_CAREER_OFFERS';

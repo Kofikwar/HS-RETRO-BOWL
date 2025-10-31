@@ -83,6 +83,13 @@ export const TrophyIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
+export const HallOfFameIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 1L2 6v2h20V6L12 1zM4 9v11h3V9H4zm5 0v11h2V9H9zm4 0v11h2V9h-2zm5 0v11h3V9h-3zM2 22h20v-1H2v1z"/>
+  </svg>
+);
+
+
 export const TacticsIcon = ({ className }: { className?: string }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="currentColor">
         <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
